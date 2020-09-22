@@ -1,17 +1,17 @@
-#FTP
+# FTP
 Minimal FTP client implementation attempting to follow [RFC959](https://tools.ietf.org/html/rfc959). Currently Work In Progress.
 
-##Usage
+## Usage
 TODO
 
-##Dependencies
+## Dependencies
 - Boost.ASIO
 - Catch2
 
-##Common issues
+## Common issues
 - 500 Illegal PORT command - use passive mode.
 
-##TODO
+## TODO
 - FTPS support(RFC2228)
 - Passive mode
 - Anonymous user support
