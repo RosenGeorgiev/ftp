@@ -149,3 +149,38 @@ TEST_CASE_METHOD(logged_in_fixture, "RETR test", "[ftp][download][retr]")
     REQUIRE_FALSE(ec);
 }
 
+TEST_CASE_METHOD(logged_in_fixture, "Rename test", "[ftp][rnfr][rnto][rename]")
+{
+    std::error_code ec;
+    m_client.rename("documents/document2.txt", "documents/document22.txt", ec);
+    REQUIRE_FALSE(ec);
+    m_client.rename("documents/document22.txt", "documents/document2.txt", ec);
+    REQUIRE_FALSE(ec);
+}
+
+TEST_CASE_METHOD(logged_in_fixture, "Remove file test", "[ftp][dele][remove]")
+{
+    SECTION("Remove existing")
+    {
+        std::error_code ec;
+        m_client.remove_file("documents/document2.txt", ec);
+        REQUIRE_FALSE(ec);
+    }
+
+    SECTION("Remove missing")
+    {
+        std::error_code ec;
+        m_client.remove_file("1337.txt", ec);
+        REQUIRE(ec);
+    }
+}
+
+TEST_CASE_METHOD(logged_in_fixture, "Create/remove directory", "[ftp][mkd][mkdir][rmd][rmdir]")
+{
+    std::error_code ec;
+    m_client.mkdir("test", ec);
+    REQUIRE_FALSE(ec);
+    m_client.rmdir("test", ec);
+    REQUIRE_FALSE(ec);
+}
+

@@ -27,16 +27,18 @@ namespace ftp
                                             return;                                 \
                                         }
 
-#define TRYB(__boost_error_code, __std_error_code) if (__boost_error_code)                                      \
-                                                   {                                                            \
-                                                       __std_error_code = boost_to_std_ec(__boost_error_code);  \
-                                                       return {};                                               \
-                                                   }
-#define TRYB_VOID(__boost_error_code, __std_error_code) if (__boost_error_code)                                     \
-                                                        {                                                           \
-                                                            __std_error_code = boost_to_std_ec(__boost_error_code); \
-                                                            return;                                                 \
-                                                        }
+#define CHECK_CONVERT_EC(__boost_error_code, __std_error_code) \
+    if (__boost_error_code)                                      \
+    {                                                            \
+        __std_error_code = boost_to_std_ec(__boost_error_code);  \
+        return {};                                               \
+    }
+#define CHECK_CONVERT_EC_VOID(__boost_error_code, __std_error_code) \
+    if (__boost_error_code)                                     \
+    {                                                           \
+        __std_error_code = boost_to_std_ec(__boost_error_code); \
+        return;                                                 \
+    }
 
 inline auto boost_to_std_ec(boost::system::error_code& a_boost_ec) noexcept -> std::error_code
 {

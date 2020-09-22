@@ -36,7 +36,6 @@ struct connection_options
 
 class client
 {
-    // TODO - How do we accept the servers data transfer connection?
     class connection
     {
     public:
@@ -53,7 +52,8 @@ class client
         auto accept_v4(
             int a_port,
             std::error_code& a_ec
-        ) noexcept -> void;
+        ) noexcept
+        -> void;
 
         auto close(std::error_code& a_ec) noexcept -> void;
 
@@ -137,11 +137,49 @@ public:
      */
     auto logout(std::error_code& a_ec) noexcept -> void;
 
-    auto download(std::string const& a_filename, std::error_code& a_ec) noexcept -> void;
+    auto download(
+        std::string const& a_filename,
+        std::error_code& a_ec
+    ) noexcept -> void;
+
+    auto rename(
+        std::string const& a_file_to_rename,
+        std::string const& a_rename_to,
+        std::error_code& a_ec
+    ) noexcept
+    -> void;
+
+    auto remove_file(
+        std::string const& a_filepath,
+        std::error_code& a_ec
+    ) noexcept
+    -> void;
+
+    auto rmdir(
+        std::string const& a_dirpath,
+        std::error_code& a_ec
+    ) noexcept
+    -> void;
+
+    auto mkdir(
+        std::string const& a_dirpath,
+        std::error_code& a_ec
+    ) noexcept
+    -> void;
 
     auto noop(std::error_code& a_ec) noexcept -> void;
 
 private:
+    auto prepare_ip_port(
+        std::string& h1,
+        std::string& h2,
+        std::string& h3,
+        std::string& h4,
+        std::string& p1,
+        std::string& p2,
+        std::error_code& a_ec
+    ) noexcept
+    -> void;
     auto accept_and_read(std::promise<std::error_code> a_ec) noexcept -> void;
 
 private:

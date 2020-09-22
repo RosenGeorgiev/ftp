@@ -480,6 +480,66 @@ inline auto retr_command(std::string const& a_filename) noexcept -> std::string
     return ss.str();
 }
 
+inline auto rnfr_command(std::string const& a_file_to_rename) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::RNFR)
+       << SP
+       << a_file_to_rename
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto rnto_command(std::string const& a_rename_to) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::RNTO)
+       << SP
+       << a_rename_to
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto dele_command(std::string const& a_filepath) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::DELE)
+       << SP
+       << a_filepath
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto rmd_command(std::string const& a_dirpath) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::RMD)
+       << SP
+       << a_dirpath
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto mkd_command(std::string const& a_dirpath) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::MKD)
+       << SP
+       << a_dirpath
+       << CRLF;
+
+    return ss.str();
+}
+
 inline auto noop_command() noexcept -> std::string
 {
     std::ostringstream ss;
