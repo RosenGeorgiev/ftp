@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <future>
+#include <vector>
 #include <system_error>
 
 #include "codes.hpp"
@@ -23,13 +24,14 @@ struct connection_options
     unsigned short server_port{DEFAULT_DATA_CONNECTION_PORT};
     std::string data_connection_host{};
     unsigned short data_connection_port{DEFAULT_DATA_CONNECTION_PORT};
-    // @Unimplemented
-    bool passive_mode{false};
+    bool passive_mode{true};
     bool debug_output{false};
     // @Unimplemented
     data_type type{data_type::ASCII};
     // @Unimplemented
-    transmission_mode mode{transmission_mode::BLOCK};
+    format_control control{format_control::NON_PRINT};
+    // @Unimplemented
+    transmission_mode mode{transmission_mode::STREAM};
     // @Unimplemented
     file_structure structure{file_structure::FILE_STRUCTURE};
 };
@@ -61,7 +63,7 @@ class client
             int a_max,
             std::error_code& a_ec
         ) noexcept
-        -> std::string;
+        -> std::vector<char>;
 
         auto read_until(
             std::string const& a_delimiter,
@@ -137,10 +139,11 @@ public:
      */
     auto logout(std::error_code& a_ec) noexcept -> void;
 
+    // TODO - Overload that takes a std::ofstream.
     auto download(
         std::string const& a_filename,
         std::error_code& a_ec
-    ) noexcept -> void;
+    ) noexcept -> std::vector<char>;
 
     auto rename(
         std::string const& a_file_to_rename,
@@ -167,19 +170,30 @@ public:
     ) noexcept
     -> void;
 
+    auto pwd(std::error_code& a_ec) noexcept -> std::string;
+
+    auto ls(std::error_code& a_ec) noexcept -> std::string;
+    auto ls(std::string const& a_pathname, std::error_code& a_ec) noexcept -> std::string;
+
+    auto system_info(std::error_code& a_ec) noexcept -> std::string;
+
+    auto progress(std::error_code& a_ec) noexcept -> std::string;
+
     auto noop(std::error_code& a_ec) noexcept -> void;
 
 private:
-    auto prepare_ip_port(
-        std::string& h1,
-        std::string& h2,
-        std::string& h3,
-        std::string& h4,
-        std::string& p1,
-        std::string& p2,
+    auto download_active(
+        std::string const& a_filename,
         std::error_code& a_ec
     ) noexcept
-    -> void;
+    -> std::vector<char>;
+
+    auto download_passive(
+        std::string const& a_filename,
+        std::error_code& a_ec
+    ) noexcept
+    -> std::vector<char>;
+
     auto accept_and_read(std::promise<std::error_code> a_ec) noexcept -> void;
 
 private:

@@ -52,6 +52,7 @@ inline auto data_type_to_str(data_type a_data_type) noexcept -> std::string
 
 enum class format_control
 {
+    NONE,
     NON_PRINT,
     TELNET_FROMAT_CONTROLS,
     CARRIAGE_CONTROL,
@@ -78,6 +79,36 @@ inline auto file_structure_to_str(file_structure a_file_structure) noexcept -> s
         return "unknown file structure";
     }
 }
+
+enum class transmission_mode
+{
+    BLOCK,
+    COMPRESSED,
+    STREAM,
+};
+
+inline auto transmission_mode_to_str(transmission_mode a_transmission_mode) noexcept -> std::string
+{
+    switch (a_transmission_mode)
+    {
+    case transmission_mode::BLOCK:
+        return "B";
+    case transmission_mode::COMPRESSED:
+        return "C";
+    case transmission_mode::STREAM:
+        return "S";
+    default:
+        return "unknown transmission mode";
+    }
+}
+
+enum class block_header_descriptor_codes
+{
+    DATA_BLOCK_IS_A_RESTART_MARKER = 16,
+    SUSPECTED_ERRORS_IN_DATA_BLOCK = 32,
+    END_OF_DATA_BLOCK_IS_EOF = 64,
+    END_OF_DATA_BLOCK_IS_EOR = 128,
+};
 
 enum class ftp_command
 {
@@ -468,6 +499,52 @@ inline auto port_command(
     return ss.str();
 }
 
+inline auto pasv_command() noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::PASV)
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto type_command(data_type a_data_type) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::TYPE)
+       << SP
+       << data_type_to_str(a_data_type)
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto stru_command(file_structure a_structure) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::STRU)
+       << SP
+       << file_structure_to_str(a_structure)
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto mode_command(transmission_mode a_mode) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::MODE)
+       << SP
+       << transmission_mode_to_str(a_mode)
+       << CRLF;
+
+    return ss.str();
+}
+
 inline auto retr_command(std::string const& a_filename) noexcept -> std::string
 {
     std::ostringstream ss;
@@ -475,6 +552,58 @@ inline auto retr_command(std::string const& a_filename) noexcept -> std::string
     ss << ftp_command_to_str(ftp_command::RETR)
        << SP
        << a_filename
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto stor_command(std::string const& a_filename) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::STOR)
+       << SP
+       << a_filename
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto appe_command(std::string const& a_filename) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::APPE)
+       << SP
+       << a_filename
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto allo_command(int a_bytes_to_reserve) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::ALLO)
+       << SP
+       << a_bytes_to_reserve
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto allo_command(int a_bytes_to_reserve, int a_max_record_or_page_size) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::ALLO)
+       << SP
+       << a_bytes_to_reserve
+       << SP
+       << 'R'
+       << SP
+       << a_max_record_or_page_size
        << CRLF;
 
     return ss.str();
@@ -536,6 +665,77 @@ inline auto mkd_command(std::string const& a_dirpath) noexcept -> std::string
        << SP
        << a_dirpath
        << CRLF;
+
+    return ss.str();
+}
+
+inline auto pwd_command() noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::PWD)
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto list_command(std::string const& a_pathname = {}) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::LIST);
+
+    if (!a_pathname.empty())
+    {
+        ss << SP;
+        ss << a_pathname;
+    }
+
+    ss << CRLF;
+
+    return ss.str();
+}
+
+inline auto nlst_command(std::string const& a_pathname = {}) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::NLST);
+
+    if (!a_pathname.empty())
+    {
+        ss << SP;
+        ss << a_pathname;
+    }
+
+    ss << CRLF;
+
+    return ss.str();
+}
+
+inline auto syst_command() noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::SYST)
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto stat_command(std::string const& a_pathname = {}) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::STAT);
+
+    if (!a_pathname.empty())
+    {
+        ss << SP;
+        ss << a_pathname;
+    }
+
+    ss << CRLF;
 
     return ss.str();
 }
@@ -743,36 +943,6 @@ inline auto reply_code_to_str(reply_code a_reply_code) noexcept -> std::string
         return "unknown reply code";
     }
 }
-
-enum class transmission_mode
-{
-    BLOCK,
-    COMPRESSED,
-    STREAM,
-};
-
-inline auto transmission_mode_to_str(transmission_mode a_transmission_mode) noexcept -> std::string
-{
-    switch (a_transmission_mode)
-    {
-    case transmission_mode::BLOCK:
-        return "B";
-    case transmission_mode::COMPRESSED:
-        return "C";
-    case transmission_mode::STREAM:
-        return "S";
-    default:
-        return "unknown transmission mode";
-    }
-}
-
-enum class block_header_descriptor_codes
-{
-    DATA_BLOCK_IS_A_RESTART_MARKER = 16,
-    SUSPECTED_ERRORS_IN_DATA_BLOCK = 32,
-    END_OF_DATA_BLOCK_IS_EOF = 64,
-    END_OF_DATA_BLOCK_IS_EOR = 128,
-};
 
 }   // namespace ftp
 }   // namespace rs

@@ -145,7 +145,7 @@ TEST_CASE_METHOD(logged_in_fixture, "REIN test", "[ftp][rein][logout]")
 TEST_CASE_METHOD(logged_in_fixture, "RETR test", "[ftp][download][retr]")
 {
     std::error_code ec;
-    m_client.download("documents/document1.txt", ec);
+    m_client.download("image.jpeg", ec);
     REQUIRE_FALSE(ec);
 }
 
@@ -175,12 +175,57 @@ TEST_CASE_METHOD(logged_in_fixture, "Remove file test", "[ftp][dele][remove]")
     }
 }
 
-TEST_CASE_METHOD(logged_in_fixture, "Create/remove directory", "[ftp][mkd][mkdir][rmd][rmdir]")
+TEST_CASE_METHOD(logged_in_fixture, "Create/remove directory test", "[ftp][mkd][mkdir][rmd][rmdir]")
 {
     std::error_code ec;
     m_client.mkdir("test", ec);
     REQUIRE_FALSE(ec);
     m_client.rmdir("test", ec);
+    REQUIRE_FALSE(ec);
+}
+
+TEST_CASE_METHOD(logged_in_fixture, "Pwd test", "[ftp][pwd]")
+{
+    std::error_code ec;
+    m_client.pwd(ec);
+    REQUIRE_FALSE(ec);
+}
+
+TEST_CASE_METHOD(logged_in_fixture, "LS test", "[ftp][ls][nlst]")
+{
+    SECTION("LS current directory")
+    {
+        std::error_code ec;
+        m_client.ls(ec);
+        REQUIRE_FALSE(ec);
+    }
+
+    SECTION("LS valid directory")
+    {
+        std::error_code ec;
+        m_client.ls("documents", ec);
+        REQUIRE_FALSE(ec);
+    }
+
+    SECTION("LS invalid directory")
+    {
+        std::error_code ec;
+        m_client.ls("i_dont_exist_neither_should_you", ec);
+        REQUIRE(ec);
+    }
+}
+
+TEST_CASE_METHOD(logged_in_fixture, "System info test", "[ftp][syst]")
+{
+    std::error_code ec;
+    m_client.system_info(ec);
+    REQUIRE_FALSE(ec);
+}
+
+TEST_CASE_METHOD(logged_in_fixture, "Progress test", "[ftp][stat][progress]")
+{
+    std::error_code ec;
+    m_client.progress(ec);
     REQUIRE_FALSE(ec);
 }
 
