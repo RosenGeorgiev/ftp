@@ -407,12 +407,43 @@ auto client::download(
     std::error_code& a_ec
 ) noexcept -> std::vector<char>
 {
+    std::vector<char> ret_data;
+    auto data_callback = [&ret_data](std::vector<char> const& a_data) -> void
+    {
+        std::copy(a_data.begin(), a_data.end(), std::back_inserter(ret_data));
+    };
+
     if (m_options.passive_mode)
     {
-        return download_active(a_filename, a_ec);
+        download_active(a_filename, data_callback, a_ec);
+        return ret_data;
     } else
     {
-        return download_passive(a_filename, a_ec);
+        download_passive(a_filename, data_callback, a_ec);
+        return ret_data;
+    }
+}
+
+auto client::download(
+    std::string const& a_filename,
+    std::ofstream& a_ofstream,
+    std::error_code& a_ec
+) noexcept
+-> void
+{
+    auto data_callback = [&a_ofstream](std::vector<char> const& a_data) -> void
+    {
+        a_ofstream.write(reinterpret_cast<char const*>(a_data.data()), a_data.size());
+    };
+
+    if (m_options.passive_mode)
+    {
+        download_active(a_filename, data_callback, a_ec);
+        return;
+    } else
+    {
+        download_passive(a_filename, data_callback, a_ec);
+        return;
     }
 }
 
@@ -618,40 +649,27 @@ auto client::noop(std::error_code& a_ec) noexcept -> void
     check_success({reply_code::OK_200}, response, a_ec);
 }
 
-auto client::download_active(
+auto client::download_passive(
     std::string const& a_filename,
+    std::function<void(std::vector<char> const&)> a_data_callback,
     std::error_code& a_ec
 ) noexcept
--> std::vector<char>
+-> void
 {
-    m_control_connection.write(pasv_command(), a_ec);
-
-    CHECK_EC(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
-    check_success({reply_code::OK_200, reply_code::ENTERING_PASSIVE_MODE_227}, response, a_ec);
-
-    CHECK_EC(a_ec);
-
-    auto [ip_vec, port] = parse_pasv_ipv4_port_reply(response, a_ec);
-
-    CHECK_EC(a_ec);
 
     connection data_transfer_connection;
-    data_transfer_connection.connect(ipv4_vec_to_str(ip_vec), port, a_ec);
 
-    CHECK_EC(a_ec);
+    enter_passive_mode(connection, a_ec);
+
+    CHECK_EC_VOID(a_ec);
 
     m_control_connection.write(retr_command(a_filename), a_ec);
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
     response = m_control_connection.read_until(CRLF, a_ec);
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
     check_success({
             reply_code::DATA_CONNECTION_OPEN_TRANSFER_STARTING_125,
@@ -660,7 +678,7 @@ auto client::download_active(
         response, a_ec
     );
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
     std::vector<char> file_buf;
     // TODO - Handle more transfer modes - default stream. When the server closes the
@@ -674,13 +692,13 @@ auto client::download_active(
             break;
         }
 
-        std::copy(data.begin(), data.end(), std::back_inserter(file_buf));
+        a_data_callback(file_buf);
     }
 
     if (a_ec && a_ec != std::errc::no_such_file_or_directory)
     {
         log_debug(a_ec.message());
-        return {};
+        return;
     } else  // NOTE - Probably caused by the server closing the connection - ignore.
     {
         a_ec = std::error_code{};
@@ -688,28 +706,25 @@ auto client::download_active(
 
     response = m_control_connection.read_until(CRLF, a_ec);
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
     check_success({reply_code::CLOSING_DATA_CONNECTION_226}, response, a_ec);
-
-    CHECK_EC(a_ec);
-
-    return file_buf;
 }
 
-auto client::download_passive(
+auto client::download_active(
     std::string const& a_filename,
+    std::function<void(std::vector<char> const&)> a_data_callback,
     std::error_code& a_ec
 ) noexcept
--> std::vector<char>
+-> void
 {
     auto ip = resolver::resolve_v4(m_options.data_connection_host, a_ec);
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
     auto ip_nums = parse_ipv4(ip, a_ec);
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
     std::string h1 = std::to_string(ip_nums[0]);
     std::string h2 = std::to_string(ip_nums[1]);
@@ -733,38 +748,43 @@ auto client::download_passive(
         a_ec
     );
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
     auto response = m_control_connection.read_until(CRLF, a_ec);
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
     check_success({reply_code::OK_200}, response, a_ec);
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
-    std::promise<std::error_code> ec_promise;
-    std::future<std::error_code> ec_future = ec_promise.get_future();
-    std::thread th(&client::accept_and_read, this, std::move(ec_promise));
+    auto accept_and_read = [&a_ec, &a_data_callback, this]() -> void
+    {
+        connection data_connection;
+        data_connection.accept_v4(m_options.data_connection_port, a_ec);
+
+        CHECK_EC_VOID(a_ec);
+
+        // FIXME - Read according to the transmission type. Currently only default STREAM supported.
+        data_connection.read_until(EOF, a_ec);
+    };
+
+    std::thread th(accept_and_read);
     m_control_connection.write(retr_command(a_filename), a_ec);
 
     // FIXME - If this fails, the accepting thread will just hang and we have no way to stop it.
     if (a_ec)
     {
-        a_ec = ec_future.get();
-        log_debug(a_ec.message());
         th.join();
-        return {};
+        return;
     }
 
     response = m_control_connection.read_until(CRLF, a_ec);
 
     if (a_ec)
     {
-        a_ec = ec_future.get();
-        log_debug(a_ec.message());
         th.join();
-        return {};
+        return;
     }
 
     check_success({
@@ -773,10 +793,9 @@ auto client::download_passive(
         response, a_ec
     );
 
-    a_ec = ec_future.get();
     th.join();
 
-    CHECK_EC(a_ec);
+    CHECK_EC_VOID(a_ec);
 
     response = m_control_connection.read_until(CRLF, a_ec);
     check_success({
@@ -784,24 +803,31 @@ auto client::download_passive(
         reply_code::FILE_ACTION_COMPLETED_250},
         response, a_ec
     );
-
-    return {};
 }
 
-auto client::accept_and_read(std::promise<std::error_code> a_ec) noexcept -> void
+auto client::enter_passive_mode(
+    connection& a_data_transfer_connection,
+    std::error_code& a_ec
+) noexcept
+-> void
 {
-    connection data_connection;
-    std::error_code ec;
-    data_connection.accept_v4(m_options.data_connection_port, ec);
+    m_control_connection.write(pasv_command(), a_ec);
 
-    if (ec)
-    {
-        a_ec.set_value(ec);
-        return;
-    }
+    CHECK_EC_VOID(a_ec);
 
-    data_connection.read_until(EOF, ec);
-    a_ec.set_value(ec);
+    auto response = m_control_connection.read_until(CRLF, a_ec);
+
+    CHECK_EC_VOID(a_ec);
+
+    check_success({reply_code::OK_200, reply_code::ENTERING_PASSIVE_MODE_227}, response, a_ec);
+
+    CHECK_EC_VOID(a_ec);
+
+    auto [ip_vec, port] = parse_pasv_ipv4_port_reply(response, a_ec);
+
+    CHECK_EC_VOID(a_ec);
+
+    a_data_transfer_connection.connect(ipv4_vec_to_str(ip_vec), port, a_ec);
 }
 
 }   // namespace ftp

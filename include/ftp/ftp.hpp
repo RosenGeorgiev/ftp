@@ -4,8 +4,9 @@
 #pragma once
 
 #include <memory>
-#include <future>
 #include <vector>
+#include <fstream>
+#include <functional>
 #include <system_error>
 
 #include "codes.hpp"
@@ -139,11 +140,17 @@ public:
      */
     auto logout(std::error_code& a_ec) noexcept -> void;
 
-    // TODO - Overload that takes a std::ofstream.
     auto download(
         std::string const& a_filename,
         std::error_code& a_ec
-    ) noexcept -> std::vector<char>;
+    ) noexcept
+    -> std::vector<char>;
+    auto download(
+        std::string const& a_filename,
+        std::ofstream& a_ofstream,
+        std::error_code& a_ec
+    ) noexcept
+    -> void;
 
     auto rename(
         std::string const& a_file_to_rename,
@@ -184,17 +191,22 @@ public:
 private:
     auto download_active(
         std::string const& a_filename,
+        std::function<void(std::vector<char> const&)> a_data_callback,
         std::error_code& a_ec
     ) noexcept
-    -> std::vector<char>;
-
+    -> void;
     auto download_passive(
         std::string const& a_filename,
+        std::function<void(std::vector<char> const&)> a_data_callback,
         std::error_code& a_ec
     ) noexcept
-    -> std::vector<char>;
+    -> void;
 
-    auto accept_and_read(std::promise<std::error_code> a_ec) noexcept -> void;
+    auto enter_passive_mode(
+        connection& a_data_transfer_connection,
+        std::error_code& a_ec
+    ) noexcept
+    -> void;
 
 private:
     connection_options m_options;
