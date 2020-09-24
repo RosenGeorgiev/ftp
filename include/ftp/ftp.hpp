@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 #include <fstream>
+#include <exception>
 #include <functional>
 
 #include "codes.hpp"
@@ -152,6 +153,14 @@ public:
     /**
      * @brief
      */
+    auto upload(
+        std::string const& a_filename,
+        std::istream& a_istream
+    )
+    -> void;
+    /**
+     * @brief
+     */
     auto rename(
         std::string const& a_file_to_rename,
         std::string const& a_rename_to
@@ -223,6 +232,18 @@ private:
 private:
     connection_options m_options;
     connection m_control_connection;
+};
+
+class end_of_file_error : public std::runtime_error
+{
+public:
+    explicit end_of_file_error(std::string const& a_msg) :
+        std::runtime_error(a_msg)
+    { }
+
+    explicit end_of_file_error(char const* a_msg) :
+        std::runtime_error(a_msg)
+    { }
 };
 
 }   // namespace ftp

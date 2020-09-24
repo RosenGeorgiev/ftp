@@ -1,5 +1,7 @@
 #include <catch2/catch.hpp>
 
+#include <fstream>
+
 #include <ftp/ftp.hpp>
 
 
@@ -110,7 +112,48 @@ TEST_CASE_METHOD(logged_in_fixture, "REIN test", "[ftp][rein][logout]")
 
 TEST_CASE_METHOD(logged_in_fixture, "RETR test", "[ftp][download][retr]")
 {
-    REQUIRE_NOTHROW(m_client.download("image.jpeg"));
+    rs::ftp::connection_options opts;
+    opts.username = "admin";
+    opts.password = "admin";
+    opts.server_hostname = "localhost";
+    opts.server_port = 21;
+    opts.data_connection_port = 50000;
+    opts.debug_output = true;
+
+    SECTION("Passive")
+    {
+
+        opts.passive_mode = true;
+        m_client.set_connection_options(opts);
+
+        SECTION("Download to byte vector")
+        {
+            REQUIRE_NOTHROW(m_client.download("image.jpeg"));
+        }
+
+        SECTION("Download to a file")
+        {
+            std::ofstream out("image.jpeg", std::ios::binary);
+            REQUIRE_NOTHROW(m_client.download("image.jpeg", out));
+        }
+    }
+
+    SECTION("Active")
+    {
+        opts.passive_mode = false;
+        m_client.set_connection_options(opts);
+
+        SECTION("Download to byte vector")
+        {
+            REQUIRE_NOTHROW(m_client.download("image.jpeg"));
+        }
+
+        SECTION("Download to a file")
+        {
+            std::ofstream out("image.jpeg", std::ios::binary);
+            REQUIRE_NOTHROW(m_client.download("image.jpeg", out));
+        }
+    }
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "Rename test", "[ftp][rnfr][rnto][rename]")

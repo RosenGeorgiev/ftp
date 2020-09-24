@@ -3,7 +3,6 @@
 #include <thread>
 #include <cassert>
 #include <algorithm>
-#include <exception>
 
 #include <boost/asio.hpp>
 
@@ -91,9 +90,20 @@ struct client::connection::impl
             throw std::logic_error("Reading from socket that is not connected");
         }
 
-        std::vector<char> buf(a_max);
-        m_socket.read_some(boost::asio::buffer(buf));
-        return buf;
+        try
+        {
+            std::vector<char> buf(a_max);
+            m_socket.read_some(boost::asio::buffer(buf));
+            return buf;
+        } catch (boost::system::system_error const& e)
+        {
+            if (e.code() == boost::asio::error::eof)
+            {
+                throw end_of_file_error("Connection reset by peer");
+            }
+
+            throw;
+        }
     }
 
     auto read_until(std::string const& a_delimiter)
@@ -358,11 +368,11 @@ auto client::download(std::string const& a_filename)
 
     if (m_options.passive_mode)
     {
-        download_active(a_filename, data_callback);
+        download_passive(a_filename, data_callback);
         return ret_data;
     } else
     {
-        download_passive(a_filename, data_callback);
+        download_active(a_filename, data_callback);
         return ret_data;
     }
 }
@@ -380,10 +390,10 @@ auto client::download(
 
     if (m_options.passive_mode)
     {
-        download_active(a_filename, data_callback);
+        download_passive(a_filename, data_callback);
     } else
     {
-        download_passive(a_filename, data_callback);
+        download_active(a_filename, data_callback);
     }
 }
 
@@ -575,13 +585,18 @@ auto client::download_passive(
         m_control_connection.read_until(CRLF)
     );
 
-    std::vector<char> file_buf;
-    // TODO - Handle more transfer modes - default stream. When the server closes the
-    //        connection - the transfer is done.
-    while (data_transfer_connection.is_open())
+    // TODO - Handle more transfer modes - default stream.
+    // NOTE - Default transfer mode - STREAM. When the server closes the connection - the transfer
+    //        is done.
+    while (true)
     {
-        auto data = data_transfer_connection.read(65536);
-        a_data_callback(file_buf);
+        try
+        {
+            a_data_callback(data_transfer_connection.read(65536));
+        } catch (end_of_file_error const& e)
+        {
+            break;
+        }
     }
 
     check_success(
@@ -625,12 +640,16 @@ auto client::download_active(
         m_control_connection.read_until(CRLF)
     );
 
+    // TODO - Handle exceptions thrown here.
     auto accept_and_read = [&a_data_callback, this]() -> void
     {
         connection data_connection;
         data_connection.accept_v4(m_options.data_connection_port);
         // FIXME - Read according to the transmission type. Currently only default STREAM supported.
-        data_connection.read_until(EOF);
+        while (true)
+        {
+            data_connection.read(65536);
+        }
     };
 
     std::thread th(accept_and_read);
