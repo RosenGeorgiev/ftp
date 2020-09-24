@@ -7,7 +7,6 @@
 #include <vector>
 #include <fstream>
 #include <functional>
-#include <system_error>
 
 #include "codes.hpp"
 
@@ -47,41 +46,26 @@ class client
 
         auto connect(
             std::string const& a_hostname,
-            int a_port,
-            std::error_code& a_ec
-        ) noexcept
+            int a_port
+        )
         -> void;
 
-        auto accept_v4(
-            int a_port,
-            std::error_code& a_ec
-        ) noexcept
+        auto accept_v4(int a_port)
         -> void;
 
-        auto close(std::error_code& a_ec) noexcept -> void;
+        auto close() -> void;
 
-        auto read(
-            int a_max,
-            std::error_code& a_ec
-        ) noexcept
+        auto read(int a_max)
         -> std::vector<char>;
 
-        auto read_until(
-            std::string const& a_delimiter,
-            std::error_code& a_ec
-        ) noexcept
+        auto read_until(std::string const& a_delimiter)
         -> std::string;
 
-        auto read_until(
-            char a_delimiter,
-            std::error_code& a_ec
-        ) noexcept
+        auto read_until(char a_delimiter)
         -> std::string;
 
-        auto write(
-            std::string const& a_buf,
-            std::error_code& a_ec
-        ) noexcept -> void;
+        auto write(std::string const& a_buf)
+        -> void;
 
         auto is_open() noexcept -> bool;
 
@@ -93,10 +77,7 @@ class client
     class resolver
     {
     public:
-        static auto resolve_v4(
-            std::string const& a_hostname,
-            std::error_code& a_ec
-        ) noexcept
+        static auto resolve_v4(std::string const& a_hostname)
         -> std::string;
     };
 
@@ -104,9 +85,15 @@ public:
     client() =default;
     client(connection_options const& a_opts);
 
+    /**
+     * @brief
+     */
     auto set_connection_options(connection_options const& a_opts) noexcept -> void;
 
-    auto connect(std::error_code& a_ec) noexcept -> void;
+    /**
+     * @brief
+     */
+    auto connect() -> void;
     /*
     auto connect(
         std::string const& a_hostname,
@@ -115,9 +102,14 @@ public:
     ) noexcept
     -> void;
     */
-    auto close(std::error_code& a_ec) noexcept -> void;
-
-    auto login(std::error_code& a_ec) noexcept -> void;
+    /**
+     * @brief
+     */
+    auto close() -> void;
+    /**
+     * @brief
+     */
+    auto login() -> void;
     /*
     auto login(
         std::string const& a_username,
@@ -126,86 +118,106 @@ public:
     ) noexcept
     -> void;
     */
-
-    auto cwd(std::string const& a_new_wd, std::error_code& a_ec) noexcept -> void;
-    auto cdup(std::error_code& a_ec) noexcept -> void;
+    /**
+     * @brief
+     */
+    auto cwd(std::string const& a_new_wd) -> void;
+    /**
+     * @brief
+     */
+    auto cdup() -> void;
 
     /**
      * @note Not supported by vsftpd.
      */
-    auto smnt(std::string const& a_mount_point, std::error_code& a_ec) noexcept -> void;
+    auto smnt(std::string const& a_mount_point) -> void;
 
     /**
      * @note Actually REIN. Logout is more descriptive of what it does. Not supported by vsftpd.
      */
-    auto logout(std::error_code& a_ec) noexcept -> void;
-
-    auto download(
-        std::string const& a_filename,
-        std::error_code& a_ec
-    ) noexcept
+    auto logout() -> void;
+    /**
+     * @brief
+     */
+    auto download(std::string const& a_filename)
     -> std::vector<char>;
+    /**
+     * @brief
+     */
     auto download(
         std::string const& a_filename,
-        std::ofstream& a_ofstream,
-        std::error_code& a_ec
-    ) noexcept
+        std::ofstream& a_ofstream
+    )
     -> void;
-
+    /**
+     * @brief
+     */
     auto rename(
         std::string const& a_file_to_rename,
-        std::string const& a_rename_to,
-        std::error_code& a_ec
-    ) noexcept
+        std::string const& a_rename_to
+    )
     -> void;
-
-    auto remove_file(
-        std::string const& a_filepath,
-        std::error_code& a_ec
-    ) noexcept
+    /**
+     * @brief
+     */
+    auto remove_file(std::string const& a_filepath)
     -> void;
-
-    auto rmdir(
-        std::string const& a_dirpath,
-        std::error_code& a_ec
-    ) noexcept
+    /**
+     * @brief
+     */
+    auto rmdir(std::string const& a_dirpath)
     -> void;
-
-    auto mkdir(
-        std::string const& a_dirpath,
-        std::error_code& a_ec
-    ) noexcept
+    /**
+     * @brief
+     */
+    auto mkdir(std::string const& a_dirpath)
     -> void;
-
-    auto pwd(std::error_code& a_ec) noexcept -> std::string;
-
-    auto ls(std::error_code& a_ec) noexcept -> std::string;
-    auto ls(std::string const& a_pathname, std::error_code& a_ec) noexcept -> std::string;
-
-    auto system_info(std::error_code& a_ec) noexcept -> std::string;
-
-    auto progress(std::error_code& a_ec) noexcept -> std::string;
-
-    auto noop(std::error_code& a_ec) noexcept -> void;
+    /**
+     * @brief
+     */
+    auto pwd() -> std::string;
+    /**
+     * @brief
+     */
+    auto ls() -> std::string;
+    /**
+     * @brief
+     */
+    auto ls(std::string const& a_pathname) -> std::string;
+    /**
+     * @brief
+     */
+    auto system_info() -> std::string;
+    /**
+     * @brief
+     */
+    auto progress() -> std::string;
+    /**
+     * @brief
+     */
+    auto noop() -> void;
 
 private:
+    /**
+     * @brief
+     */
     auto download_active(
         std::string const& a_filename,
-        std::function<void(std::vector<char> const&)> a_data_callback,
-        std::error_code& a_ec
-    ) noexcept
+        std::function<void(std::vector<char> const&)> a_data_callback
+    )
     -> void;
+    /**
+     * @brief
+     */
     auto download_passive(
         std::string const& a_filename,
-        std::function<void(std::vector<char> const&)> a_data_callback,
-        std::error_code& a_ec
-    ) noexcept
+        std::function<void(std::vector<char> const&)> a_data_callback
+    )
     -> void;
-
-    auto enter_passive_mode(
-        connection& a_data_transfer_connection,
-        std::error_code& a_ec
-    ) noexcept
+    /**
+     * @brief
+     */
+    auto enter_passive_mode(connection& a_data_transfer_connection)
     -> void;
 
 private:

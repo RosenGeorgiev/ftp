@@ -10,8 +10,8 @@
 #include <sstream>
 #include <cassert>
 #include <iostream>
+#include <exception>
 #include <algorithm>
-#include <system_error>
 
 
 namespace rs
@@ -19,38 +19,8 @@ namespace rs
 namespace ftp
 {
 
-#define CHECK_EC(__std_error_code) if (__std_error_code)                        \
-                                   {                                            \
-                                       log_debug(__std_error_code.message());   \
-                                       return {};                               \
-                                   }
-#define CHECK_EC_VOID(__std_error_code) if (__std_error_code)                       \
-                                        {                                           \
-                                            log_debug(__std_error_code.message());  \
-                                            return;                                 \
-                                        }
-
-#define CHECK_CONVERT_EC(__boost_error_code, __std_error_code)      \
-    if (__boost_error_code)                                         \
-    {                                                               \
-        __std_error_code = boost_to_std_ec(__boost_error_code);     \
-        return {};                                                  \
-    }
-#define CHECK_CONVERT_EC_VOID(__boost_error_code, __std_error_code) \
-    if (__boost_error_code)                                         \
-    {                                                               \
-        __std_error_code = boost_to_std_ec(__boost_error_code);     \
-        return;                                                     \
-    }
-
-
 static std::regex const ipv4_regex{R"###((\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}))###"};
 static std::regex const pasv_reply_regex{R"###(\((\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})\))###"};
-
-inline auto boost_to_std_ec(boost::system::error_code& a_boost_ec) noexcept -> std::error_code
-{
-    return std::make_error_code(static_cast<std::errc>(a_boost_ec.value()));
-}
 
 inline auto log_debug(std::string const& a_log_str) noexcept -> void
 {
@@ -81,18 +51,15 @@ inline auto parse_codes(
 
 inline auto check_success(
     std::vector<reply_code> const& a_accepted_codes,
-    std::string const& a_reply_str,
-    std::error_code& a_ec
-) noexcept
+    std::string const& a_reply_str
+)
 -> void
 {
     auto returned_codes = parse_codes(a_reply_str);
 
     if (returned_codes.empty())
     {
-        log_debug("No reply codes returned!");
-        a_ec = std::make_error_code(std::errc::no_message);
-        return;
+        throw std::runtime_error("No reply codes returned - invalid response");
     }
 
     std::vector<reply_code> matched;
@@ -105,26 +72,22 @@ inline auto check_success(
         std::back_inserter(matched)
     );
 
-    // TODO - Better errors.
     if (matched.empty())
     {
-        a_ec = std::make_error_code(std::errc::bad_message);
+        throw std::runtime_error("No reply codes matched - operation failed");
     }
 }
 
 inline auto parse_ipv4(
-    std::string const& a_ip_str,
-    std::error_code& a_ec
-) noexcept
+    std::string const& a_ip_str
+)
 -> std::vector<int>
 {
     std::smatch ip_match;
 
     if (!std::regex_match(a_ip_str, ip_match, ipv4_regex) || ip_match.size() < 4)
     {
-        log_debug("Failed to parse IP address!");
-        a_ec = std::make_error_code(std::errc::address_not_available);
-        return {};
+        throw std::runtime_error("Failed to parse IP address");
     }
 
     log_debug(ip_match[0]);
@@ -144,9 +107,8 @@ inline auto port_to_network(unsigned short a_port) noexcept
 }
 
 inline auto parse_pasv_ipv4_port_reply(
-    std::string const& a_pasv_reply,
-    std::error_code& a_ec
-) noexcept
+    std::string const& a_pasv_reply
+)
 -> std::tuple<std::vector<int>, unsigned short>
 {
     std::smatch ip_port_match;
@@ -154,12 +116,8 @@ inline auto parse_pasv_ipv4_port_reply(
     if (!std::regex_search(a_pasv_reply, ip_port_match, pasv_reply_regex) ||
         ip_port_match.size() < 6)
     {
-        log_debug("Failed to parse PASV reply!");
-        a_ec = std::make_error_code(std::errc::address_not_available);
-        return {};
+        throw std::runtime_error("Failed to parse PASV reply");
     }
-
-    log_debug(ip_port_match[0]);
 
     std::vector<int> address{
         std::stoi(ip_port_match[1]),

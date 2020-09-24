@@ -1,7 +1,5 @@
 #include <catch2/catch.hpp>
 
-#include <system_error>
-
 #include <ftp/ftp.hpp>
 
 
@@ -20,14 +18,8 @@ public:
 
         m_client.set_connection_options(opts);
 
-        std::error_code ec;
-        m_client.connect(ec);
-
-        REQUIRE_FALSE(ec);
-
-        m_client.login(ec);
-
-        REQUIRE_FALSE(ec);
+        REQUIRE_NOTHROW(m_client.connect());
+        REQUIRE_NOTHROW(m_client.login());
     }
 
 protected:
@@ -45,15 +37,11 @@ TEST_CASE("Connection test", "[ftp][connect]")
         opts.debug_output = true;
 
         rs::ftp::client client(opts);
-        std::error_code ec;
-        client.connect(ec);
-
-        REQUIRE_FALSE(ec);
+        REQUIRE_NOTHROW(client.connect());
 
         SECTION("Close")
         {
-            client.close(ec);
-            REQUIRE_FALSE(ec);
+            REQUIRE_NOTHROW(client.close());
         }
     }
 
@@ -65,10 +53,7 @@ TEST_CASE("Connection test", "[ftp][connect]")
         opts.debug_output = true;
 
         rs::ftp::client client(opts);
-        std::error_code ec;
-        client.connect(ec);
-
-        REQUIRE(ec);
+        REQUIRE_THROWS(client.connect());
     }
 }
 
@@ -85,14 +70,9 @@ TEST_CASE("Login test", "[ftp][login]")
         opts.password = "admin";
 
         rs::ftp::client client(opts);
-        std::error_code ec;
-        client.connect(ec);
 
-        REQUIRE_FALSE(ec);
-
-        client.login(ec);
-
-        REQUIRE_FALSE(ec);
+        REQUIRE_NOTHROW(client.connect());
+        REQUIRE_NOTHROW(client.login());
     }
 
     SECTION("Failed login")
@@ -101,131 +81,93 @@ TEST_CASE("Login test", "[ftp][login]")
         opts.password = "";
 
         rs::ftp::client client(opts);
-        std::error_code ec;
-        client.connect(ec);
 
-        REQUIRE_FALSE(ec);
-
-        client.login(ec);
-
-        REQUIRE(ec);
+        REQUIRE_NOTHROW(client.connect());
+        REQUIRE_THROWS(client.login());
     }
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "NOOP test", "[ftp][noop]")
 {
-    std::error_code ec;
-    m_client.noop(ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.noop());
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "CWD/CDUP test", "[ftp][cwd][cdup]")
 {
-    std::error_code ec;
-    m_client.cwd("documents", ec);
-    REQUIRE_FALSE(ec);
-    m_client.cdup(ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.cwd("documents"));
+    REQUIRE_NOTHROW(m_client.cdup());
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "SMNT test", "[ftp][smnt]")
 {
-    std::error_code ec;
-    m_client.smnt("documents", ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.smnt("documents"));
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "REIN test", "[ftp][rein][logout]")
 {
-    std::error_code ec;
-    m_client.logout(ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.logout());
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "RETR test", "[ftp][download][retr]")
 {
-    std::error_code ec;
-    m_client.download("image.jpeg", ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.download("image.jpeg"));
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "Rename test", "[ftp][rnfr][rnto][rename]")
 {
-    std::error_code ec;
-    m_client.rename("documents/document2.txt", "documents/document22.txt", ec);
-    REQUIRE_FALSE(ec);
-    m_client.rename("documents/document22.txt", "documents/document2.txt", ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.rename("documents/document2.txt", "documents/document22.txt"));
+    REQUIRE_NOTHROW(m_client.rename("documents/document22.txt", "documents/document2.txt"));
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "Remove file test", "[ftp][dele][remove]")
 {
     SECTION("Remove existing")
     {
-        std::error_code ec;
-        m_client.remove_file("documents/document2.txt", ec);
-        REQUIRE_FALSE(ec);
+        REQUIRE_NOTHROW(m_client.remove_file("documents/document2.txt"));
     }
 
     SECTION("Remove missing")
     {
-        std::error_code ec;
-        m_client.remove_file("1337.txt", ec);
-        REQUIRE(ec);
+        REQUIRE_THROWS(m_client.remove_file("1337.txt"));
     }
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "Create/remove directory test", "[ftp][mkd][mkdir][rmd][rmdir]")
 {
-    std::error_code ec;
-    m_client.mkdir("test", ec);
-    REQUIRE_FALSE(ec);
-    m_client.rmdir("test", ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.mkdir("test"));
+    REQUIRE_NOTHROW(m_client.rmdir("test"));
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "Pwd test", "[ftp][pwd]")
 {
-    std::error_code ec;
-    m_client.pwd(ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.pwd());
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "LS test", "[ftp][ls][nlst]")
 {
     SECTION("LS current directory")
     {
-        std::error_code ec;
-        m_client.ls(ec);
-        REQUIRE_FALSE(ec);
+        REQUIRE_NOTHROW(m_client.ls());
     }
 
     SECTION("LS valid directory")
     {
-        std::error_code ec;
-        m_client.ls("documents", ec);
-        REQUIRE_FALSE(ec);
+        REQUIRE_NOTHROW(m_client.ls("documents"));
     }
 
     SECTION("LS invalid directory")
     {
-        std::error_code ec;
-        m_client.ls("i_dont_exist_neither_should_you", ec);
-        REQUIRE(ec);
+        REQUIRE_THROWS(m_client.ls("i_dont_exist_neither_should_you"));
     }
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "System info test", "[ftp][syst]")
 {
-    std::error_code ec;
-    m_client.system_info(ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.system_info());
 }
 
 TEST_CASE_METHOD(logged_in_fixture, "Progress test", "[ftp][stat][progress]")
 {
-    std::error_code ec;
-    m_client.progress(ec);
-    REQUIRE_FALSE(ec);
+    REQUIRE_NOTHROW(m_client.progress());
 }
 
