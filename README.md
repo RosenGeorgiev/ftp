@@ -17,4 +17,3 @@ TODO
 
 ## TODO
 - Anonymous user support
-- Custom errors
