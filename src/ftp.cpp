@@ -455,24 +455,52 @@ auto client::pwd()
     throw std::length_error("Server returned malformed response");
 }
 
-// TODO - Finish
-// TODO - Read on the DTP
 auto client::ls()
 -> std::string
 {
+    connection data_transfer_connection;
+    enter_passive_mode(data_transfer_connection);
     m_control_connection.write(nlst_command());
-    auto response = m_control_connection.read_until(CRLF);
-    return {};
+    check_success(
+        {
+            reply_code::DATA_CONNECTION_OPEN_TRANSFER_STARTING_125,
+            reply_code::FILE_STATUS_OK_OPENING_DATA_CONNECTION_150
+        },
+        m_control_connection.read_until(CRLF)
+    );
+    auto response = data_transfer_connection.read_until(CRLF);
+    check_success(
+        {
+            reply_code::CLOSING_DATA_CONNECTION_226,
+            reply_code::FILE_ACTION_COMPLETED_250
+        },
+        m_control_connection.read_until(CRLF)
+    );
+    return response;
 }
 
-// TODO - Finish
-// TODO - Read on the DTP
 auto client::ls(std::string const& a_pathname)
 -> std::string
 {
-    m_control_connection.write(stat_command(a_pathname));
-    auto response = m_control_connection.read_until(CRLF);
-    return {};
+    connection data_transfer_connection;
+    enter_passive_mode(data_transfer_connection);
+    m_control_connection.write(nlst_command(a_pathname));
+    check_success(
+        {
+            reply_code::DATA_CONNECTION_OPEN_TRANSFER_STARTING_125,
+            reply_code::FILE_STATUS_OK_OPENING_DATA_CONNECTION_150
+        },
+        m_control_connection.read_until(CRLF)
+    );
+    auto response = data_transfer_connection.read_until(CRLF);
+    check_success(
+        {
+            reply_code::CLOSING_DATA_CONNECTION_226,
+            reply_code::FILE_ACTION_COMPLETED_250
+        },
+        m_control_connection.read_until(CRLF)
+    );
+    return response;
 }
 
 auto client::system_info()
