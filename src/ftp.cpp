@@ -3,7 +3,7 @@
 #include <thread>
 #include <cassert>
 #include <algorithm>
-#include <system_error>
+#include <exception>
 
 #include <boost/asio.hpp>
 
@@ -28,65 +28,51 @@ struct client::connection::impl
     {
         if (is_open())
         {
-            std::error_code ec;
-            close(ec);
+            try
+            {
+                close();
+            } catch (std::exception const& e)
+            {
+                log_debug(e.what());
+            }
         }
     }
 
     auto connect(
         std::string const& a_hostname,
-        int a_port,
-        std::error_code& a_ec
-    ) noexcept
+        int a_port
+    )
     -> void
     {
         if (a_port < 0 || a_hostname.empty())
         {
             assert(false && "negative port number or empty hostname");
-            a_ec = std::make_error_code(std::errc::invalid_argument);
-            return;
+            throw std::invalid_argument("Negative port number or empty hostname");
         }
 
         if (m_socket.is_open())
         {
             assert(false && "already connected");
-            a_ec = std::make_error_code(std::errc::already_connected);
-            return;
+            throw std::invalid_argument("Already connected");
         }
 
         boost::asio::ip::tcp::resolver resolver(m_io_context);
-        boost::system::error_code ec;
-        auto endpoints = resolver.resolve(a_hostname, std::to_string(a_port), ec);
-
-        CHECK_CONVERT_EC_VOID(ec, a_ec);
-
-        boost::asio::connect(m_socket, endpoints, ec);
-
-        CHECK_CONVERT_EC_VOID(ec, a_ec);
+        auto endpoints = resolver.resolve(a_hostname, std::to_string(a_port));
+        boost::asio::connect(m_socket, endpoints);
     }
 
-    auto accept_v4(
-        int a_port,
-        std::error_code& a_ec
-    ) noexcept
+    auto accept_v4(int a_port)
     -> void
     {
-        try
-        {
-            boost::asio::ip::tcp::acceptor acceptor(
-                m_io_context,
-                boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), a_port)
-            );
+        boost::asio::ip::tcp::acceptor acceptor(
+            m_io_context,
+            boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), a_port)
+        );
 
-            acceptor.accept(m_socket);
-        } catch (std::exception const& e)
-        {
-            log_debug(e.what());
-            a_ec = std::make_error_code(std::errc::operation_not_permitted);
-        }
+        acceptor.accept(m_socket);
     }
 
-    auto close(std::error_code& a_ec) noexcept -> void
+    auto close() -> void
     {
         if (!m_socket.is_open())
         {
@@ -94,110 +80,65 @@ struct client::connection::impl
             return;
         }
 
-        boost::system::error_code ec;
-        m_socket.close(ec);
-
-        CHECK_CONVERT_EC_VOID(ec, a_ec);
+        m_socket.close();
     }
 
-    auto read(
-        int a_max,
-        std::error_code& a_ec
-    ) noexcept
+    auto read(int a_max)
     -> std::vector<char>
     {
         if (!m_socket.is_open())
         {
-            assert(false && "reading from socket that is not connected");
-            a_ec = std::make_error_code(std::errc::not_connected);
-            return {};
+            throw std::logic_error("Reading from socket that is not connected");
         }
 
         std::vector<char> buf(a_max);
-
-        boost::system::error_code ec;
-
-        m_socket.read_some(boost::asio::buffer(buf), ec);
-
-        CHECK_CONVERT_EC(ec, a_ec);
-
+        m_socket.read_some(boost::asio::buffer(buf));
         return buf;
     }
 
-    auto read_until(
-        std::string const& a_delimiter,
-        std::error_code& a_ec
-    ) noexcept
+    auto read_until(std::string const& a_delimiter)
     -> std::string
     {
         if (!m_socket.is_open())
         {
-            assert(false && "reading from socket that is not connected");
-            a_ec = std::make_error_code(std::errc::not_connected);
-            return {};
+            throw std::logic_error("Reading from socket that is not connected");
         }
 
         std::vector<char> buf;
-
-        boost::system::error_code ec;
-
         boost::asio::read_until(
             m_socket,
             boost::asio::dynamic_buffer(buf),
-            a_delimiter,
-            ec
+            a_delimiter
         );
-
-        CHECK_CONVERT_EC(ec, a_ec);
-
         return std::string(buf.begin(), buf.end());
     }
 
-    auto read_until(
-        char a_delimiter,
-        std::error_code& a_ec
-    ) noexcept
+    auto read_until(char a_delimiter)
     -> std::string
     {
         if (!m_socket.is_open())
         {
-            assert(false && "reading from socket that is not connected");
-            a_ec = std::make_error_code(std::errc::not_connected);
-            return {};
+            throw std::logic_error("Reading from socket that is not connected");
         }
 
         std::vector<char> buf;
-
-        boost::system::error_code ec;
-
         boost::asio::read_until(
             m_socket,
             boost::asio::dynamic_buffer(buf),
-            a_delimiter,
-            ec
+            a_delimiter
         );
-
-        CHECK_CONVERT_EC(ec, a_ec);
-
         return std::string(buf.begin(), buf.end());
     }
 
-    auto write(
-        std::string const& a_buf,
-        std::error_code& a_ec
-    ) noexcept -> void
+    auto write(std::string const& a_buf)
+    -> void
     {
         if (!m_socket.is_open())
         {
-            assert(false && "writing to socket that is not connected");
-            a_ec = std::make_error_code(std::errc::not_connected);
-            return;
+            throw std::logic_error("Writing to socket that is not connected");
         }
 
-        boost::system::error_code ec;
-        m_socket.write_some(boost::asio::buffer(a_buf), ec);
-
-        CHECK_CONVERT_EC_VOID(ec, a_ec);
+        m_socket.write_some(boost::asio::buffer(a_buf));
     }
 
     auto is_open() noexcept -> bool
@@ -214,92 +155,77 @@ client::connection::~connection() noexcept
 {
     if (is_open())
     {
-        std::error_code ec;
-        close(ec);
+        try
+        {
+            close();
+        } catch (std::exception const& e)
+        {
+            log_debug(e.what());
+        }
     }
 }
 
 auto client::connection::connect(
     std::string const& a_host,
-    int a_port,
-    std::error_code& a_ec
-) noexcept
+    int a_port
+)
 -> void
 {
-    m_impl->connect(a_host, a_port, a_ec);
+    m_impl->connect(a_host, a_port);
 }
 
-auto client::connection::accept_v4(
-    int a_port,
-    std::error_code& a_ec
-) noexcept -> void
+auto client::connection::accept_v4(int a_port)
+-> void
 {
-    m_impl->accept_v4(a_port, a_ec);
+    m_impl->accept_v4(a_port);
 }
 
-auto client::connection::close(std::error_code& a_ec) noexcept -> void
+auto client::connection::close() -> void
 {
-    m_impl->close(a_ec);
+    m_impl->close();
 }
 
-auto client::connection::read(
-    int a_max,
-    std::error_code& a_ec
-) noexcept
+auto client::connection::read(int a_max)
 -> std::vector<char>
 {
-    return m_impl->read(a_max, a_ec);
+    return m_impl->read(a_max);
 }
 
-auto client::connection::read_until(
-    std::string const& a_delimiter,
-    std::error_code& a_ec
-) noexcept
+auto client::connection::read_until(std::string const& a_delimiter)
 -> std::string
 {
-    auto result = m_impl->read_until(a_delimiter, a_ec);
+    auto result = m_impl->read_until(a_delimiter);
     log_debug(result);
     return result;
 }
 
-auto client::connection::read_until(
-    char a_delimiter,
-    std::error_code& a_ec
-) noexcept
+auto client::connection::read_until(char a_delimiter)
 -> std::string
 {
-    auto result = m_impl->read_until(a_delimiter, a_ec);
+    auto result = m_impl->read_until(a_delimiter);
     log_debug(result);
     return result;
 }
 
-auto client::connection::write(
-    std::string const& a_buf,
-    std::error_code& a_ec
-) noexcept -> void
+auto client::connection::write(std::string const& a_buf)
+-> void
 {
     log_debug(a_buf);
-    m_impl->write(a_buf, a_ec);
+    m_impl->write(a_buf);
 }
 
-auto client::connection::is_open() noexcept -> bool
+auto client::connection::is_open() noexcept
+-> bool
 {
     return m_impl->is_open();
 }
 
-auto client::resolver::resolve_v4(
-    std::string const& a_hostname,
-    std::error_code& a_ec
-) noexcept
+auto client::resolver::resolve_v4(std::string const& a_hostname)
 -> std::string
 {
     boost::asio::io_context io_context;
     boost::asio::ip::tcp::resolver resolver(io_context);
-    boost::system::error_code ec;
-
-    auto endpoints = resolver.resolve(a_hostname, "ftp", ec);
-
-    CHECK_CONVERT_EC(ec, a_ec);
+    auto endpoints = resolver.resolve(a_hostname, "ftp");
 
     for (auto it = endpoints.begin(); it != endpoints.end(); ++it)
     {
@@ -309,8 +235,7 @@ auto client::resolver::resolve_v4(
         }
     }
 
-    a_ec = std::make_error_code(std::errc::address_not_available);
-    return {};
+    throw std::runtime_error("Failed to resolve address");
 }
 
 client::client(connection_options const& a_opts) :
@@ -320,194 +245,205 @@ client::client(connection_options const& a_opts) :
     assert(a_opts.server_port > 0 && "negative server port");
 }
 
-auto client::set_connection_options(connection_options const& a_opts) noexcept -> void
+auto client::set_connection_options(connection_options const& a_opts) noexcept
+-> void
 {
     m_options = a_opts;
 }
 
-auto client::connect(std::error_code& a_ec) noexcept -> void
+auto client::connect()
+-> void
 {
-    m_control_connection.connect(m_options.server_hostname, m_options.server_port, a_ec);
-    CHECK_EC_VOID(a_ec);
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-    CHECK_EC_VOID(a_ec);
-    check_success({reply_code::OK_200, reply_code::READY_FOR_NEW_USER_220}, response, a_ec);
+    m_control_connection.connect(
+        m_options.server_hostname,
+        m_options.server_port
+    );
+
+    check_success(
+        {
+            reply_code::OK_200,
+            reply_code::READY_FOR_NEW_USER_220
+        },
+        m_control_connection.read_until(CRLF)
+    );
 }
 
-auto client::close(std::error_code& a_ec) noexcept -> void
+auto client::close()
+-> void
 {
     if (m_control_connection.is_open())
     {
-        m_control_connection.write(quit_command(), a_ec);
-        CHECK_EC_VOID(a_ec);
-        auto response = m_control_connection.read_until(CRLF, a_ec);
-        CHECK_EC_VOID(a_ec);
-        check_success({reply_code::CLOSING_CONTROL_CONNECTION_221}, response, a_ec);
-        m_control_connection.close(a_ec);
+        m_control_connection.write(quit_command());
+        check_success(
+            {reply_code::CLOSING_CONTROL_CONNECTION_221},
+            m_control_connection.read_until(CRLF)
+        );
+        m_control_connection.close();
     }
 }
 
-auto client::login(std::error_code& a_ec) noexcept -> void
+auto client::login()
+-> void
 {
-    m_control_connection.write(user_command(m_options.username), a_ec);
-    CHECK_EC_VOID(a_ec);
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-    CHECK_EC_VOID(a_ec);
-    check_success({
-        reply_code::USER_LOGGED_IN_230,
-        reply_code::USERNAME_OK_NEED_PASSWORD_331,
-        reply_code::NEED_ACCOUNT_332},
-        response, a_ec
+    m_control_connection.write(user_command(m_options.username));
+    check_success(
+        {
+            reply_code::USER_LOGGED_IN_230,
+            reply_code::USERNAME_OK_NEED_PASSWORD_331,
+            reply_code::NEED_ACCOUNT_332
+        },
+        m_control_connection.read_until(CRLF)
     );
-    CHECK_EC_VOID(a_ec);
-    m_control_connection.write(password_command(m_options.password), a_ec);
-    CHECK_EC_VOID(a_ec);
-    response = m_control_connection.read_until(CRLF, a_ec);
-    check_success({reply_code::USER_LOGGED_IN_230}, response, a_ec);
+    m_control_connection.write(password_command(m_options.password));
+    check_success(
+        {reply_code::USER_LOGGED_IN_230},
+        m_control_connection.read_until(CRLF)
+    );
 }
 
-auto client::cwd(std::string const& a_new_wd, std::error_code& a_ec) noexcept -> void
+auto client::cwd(std::string const& a_new_wd)
+-> void
 {
-    m_control_connection.write(cwd_command(a_new_wd), a_ec);
-    CHECK_EC_VOID(a_ec);
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-    CHECK_EC_VOID(a_ec);
-    check_success({reply_code::FILE_ACTION_COMPLETED_250}, response, a_ec);
+    m_control_connection.write(cwd_command(a_new_wd));
+    check_success(
+        {reply_code::FILE_ACTION_COMPLETED_250},
+        m_control_connection.read_until(CRLF)
+    );
 }
 
-auto client::cdup(std::error_code& a_ec) noexcept -> void
+auto client::cdup()
+-> void
 {
-    m_control_connection.write(cdup_command(), a_ec);
-    CHECK_EC_VOID(a_ec);
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-    CHECK_EC_VOID(a_ec);
-    check_success({reply_code::OK_200, reply_code::FILE_ACTION_COMPLETED_250}, response, a_ec);
+    m_control_connection.write(cdup_command());
+    check_success(
+        {
+            reply_code::OK_200,
+            reply_code::FILE_ACTION_COMPLETED_250
+        },
+        m_control_connection.read_until(CRLF)
+    );
 }
 
-auto client::smnt(std::string const& a_mount_point, std::error_code& a_ec) noexcept -> void
+auto client::smnt(std::string const& a_mount_point)
+-> void
 {
-    m_control_connection.write(smnt_command(a_mount_point), a_ec);
-    CHECK_EC_VOID(a_ec);
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-    CHECK_EC_VOID(a_ec);
-    check_success({reply_code::NOT_IMPLEMENTED_202, reply_code::FILE_ACTION_COMPLETED_250}, response, a_ec);
+    m_control_connection.write(smnt_command(a_mount_point));
+    check_success(
+        {
+            reply_code::NOT_IMPLEMENTED_202,
+            reply_code::FILE_ACTION_COMPLETED_250
+        },
+        m_control_connection.read_until(CRLF)
+    );
 }
 
-auto client::logout(std::error_code& a_ec) noexcept -> void
+auto client::logout()
+-> void
 {
-    m_control_connection.write(rein_command(), a_ec);
-    CHECK_EC_VOID(a_ec);
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-    CHECK_EC_VOID(a_ec);
-    check_success({reply_code::READY_FOR_NEW_USER_220}, response, a_ec);
+    m_control_connection.write(rein_command());
+    check_success(
+        {reply_code::READY_FOR_NEW_USER_220},
+        m_control_connection.read_until(CRLF)
+    );
+}
+
+auto client::download(std::string const& a_filename)
+-> std::vector<char>
+{
+    std::vector<char> ret_data;
+    auto data_callback = [&ret_data](std::vector<char> const& a_data) -> void
+    {
+        std::copy(a_data.begin(), a_data.end(), std::back_inserter(ret_data));
+    };
+
+    if (m_options.passive_mode)
+    {
+        download_active(a_filename, data_callback);
+        return ret_data;
+    } else
+    {
+        download_passive(a_filename, data_callback);
+        return ret_data;
+    }
 }
 
 auto client::download(
     std::string const& a_filename,
-    std::error_code& a_ec
-) noexcept -> std::vector<char>
+    std::ofstream& a_ofstream
+)
+-> void
 {
+    auto data_callback = [&a_ofstream](std::vector<char> const& a_data) -> void
+    {
+        a_ofstream.write(reinterpret_cast<char const*>(a_data.data()), a_data.size());
+    };
+
     if (m_options.passive_mode)
     {
-        return download_active(a_filename, a_ec);
+        download_active(a_filename, data_callback);
     } else
     {
-        return download_passive(a_filename, a_ec);
+        download_passive(a_filename, data_callback);
     }
 }
 
 auto client::rename(
     std::string const& a_file_to_rename,
-    std::string const& a_rename_to,
-    std::error_code& a_ec
-) noexcept
+    std::string const& a_rename_to
+)
 -> void
 {
-    m_control_connection.write(rnfr_command(a_file_to_rename), a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    check_success({reply_code::REQUESTED_FILE_ACTION_INFO_PENDING_350}, response, a_ec);
-
-    m_control_connection.write(rnto_command(a_rename_to), a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    check_success({reply_code::FILE_ACTION_COMPLETED_250}, response, a_ec);
+    m_control_connection.write(rnfr_command(a_file_to_rename));
+    check_success(
+        {reply_code::REQUESTED_FILE_ACTION_INFO_PENDING_350},
+        m_control_connection.read_until(CRLF)
+    );
+    m_control_connection.write(rnto_command(a_rename_to));
+    check_success(
+        {reply_code::FILE_ACTION_COMPLETED_250},
+        m_control_connection.read_until(CRLF)
+    );
 }
 
-auto client::remove_file(
-    std::string const& a_filepath,
-    std::error_code& a_ec
-) noexcept
+auto client::remove_file(std::string const& a_filepath)
 -> void
 {
-    m_control_connection.write(dele_command(a_filepath), a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    check_success({reply_code::FILE_ACTION_COMPLETED_250}, response, a_ec);
+    m_control_connection.write(dele_command(a_filepath));
+    check_success(
+        {reply_code::FILE_ACTION_COMPLETED_250},
+        m_control_connection.read_until(CRLF)
+    );
 }
 
-auto client::rmdir(
-    std::string const& a_dirpath,
-    std::error_code& a_ec
-) noexcept
+auto client::rmdir(std::string const& a_dirpath)
 -> void
 {
-    m_control_connection.write(rmd_command(a_dirpath), a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    check_success({reply_code::FILE_ACTION_COMPLETED_250}, response, a_ec);
+    m_control_connection.write(rmd_command(a_dirpath));
+    check_success(
+        {reply_code::FILE_ACTION_COMPLETED_250},
+        m_control_connection.read_until(CRLF)
+    );
 }
 
-auto client::mkdir(
-    std::string const& a_dirpath,
-    std::error_code& a_ec
-) noexcept
+auto client::mkdir(std::string const& a_dirpath)
 -> void
 {
-    m_control_connection.write(mkd_command(a_dirpath), a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC_VOID(a_ec);
-
-    check_success({reply_code::PATHNAME_CREATED_257}, response, a_ec);
+    m_control_connection.write(mkd_command(a_dirpath));
+    check_success(
+        {reply_code::PATHNAME_CREATED_257},
+        m_control_connection.read_until(CRLF)
+    );
 }
 
-auto client::pwd(std::error_code& a_ec) noexcept -> std::string
+auto client::pwd()
+-> std::string
 {
-    m_control_connection.write(pwd_command(), a_ec);
-
-    CHECK_EC(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
-    check_success({reply_code::PATHNAME_CREATED_257}, response, a_ec);
-
-    CHECK_EC(a_ec);
+    m_control_connection.write(pwd_command());
+    auto response = m_control_connection.read_until(CRLF);
+    check_success(
+        {reply_code::PATHNAME_CREATED_257},
+        response
+    );
 
     if (response.size() > 4)
     {
@@ -516,55 +452,38 @@ auto client::pwd(std::error_code& a_ec) noexcept -> std::string
         return ret;
     }
 
-    log_debug("Server returned malformed response");
-    a_ec = std::make_error_code(std::errc:: bad_message);
+    throw std::length_error("Server returned malformed response");
+}
 
+// TODO - Finish
+// TODO - Read on the DTP
+auto client::ls()
+-> std::string
+{
+    m_control_connection.write(nlst_command());
+    auto response = m_control_connection.read_until(CRLF);
     return {};
 }
 
 // TODO - Finish
 // TODO - Read on the DTP
-auto client::ls(std::error_code& a_ec) noexcept -> std::string
+auto client::ls(std::string const& a_pathname)
+-> std::string
 {
-    m_control_connection.write(nlst_command(), a_ec);
-
-    CHECK_EC(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
+    m_control_connection.write(stat_command(a_pathname));
+    auto response = m_control_connection.read_until(CRLF);
     return {};
 }
 
-// TODO - Finish
-// TODO - Read on the DTP
-auto client::ls(std::string const& a_pathname, std::error_code& a_ec) noexcept -> std::string
+auto client::system_info()
+-> std::string
 {
-    m_control_connection.write(stat_command(a_pathname), a_ec);
-
-    CHECK_EC(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
-    return {};
-}
-
-auto client::system_info(std::error_code& a_ec) noexcept -> std::string
-{
-    m_control_connection.write(syst_command(), a_ec);
-
-    CHECK_EC(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
-    check_success({reply_code::X_SYSTEM_TYPE_215}, response, a_ec);
-
-    CHECK_EC(a_ec);
+    m_control_connection.write(syst_command());
+    auto response = m_control_connection.read_until(CRLF);
+    check_success(
+        {reply_code::X_SYSTEM_TYPE_215},
+        response
+    );
 
     if (response.size() > 4)
     {
@@ -573,28 +492,21 @@ auto client::system_info(std::error_code& a_ec) noexcept -> std::string
         return ret;
     }
 
-    log_debug("Server returned malformed response");
-    a_ec = std::make_error_code(std::errc:: bad_message);
-
-    return {};
+    throw std::length_error("Server returned malformed response");
 }
 
 // TODO - Validate server response
-auto client::progress(std::error_code& a_ec) noexcept -> std::string
+auto client::progress()
+-> std::string
 {
-    m_control_connection.write(stat_command(), a_ec);
-
-    CHECK_EC(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
-    check_success({
+    m_control_connection.write(stat_command());
+    auto response = m_control_connection.read_until(CRLF);
+    check_success(
+        {
             reply_code::DIRECTORY_STATUS_212,
             reply_code::FILE_STATUS_213
         },
-        response, a_ec
+        response
     );
 
     if (response.size() > 4)
@@ -604,112 +516,60 @@ auto client::progress(std::error_code& a_ec) noexcept -> std::string
         return ret;
     }
 
-    log_debug("Server returned malformed response");
-    a_ec = std::make_error_code(std::errc:: bad_message);
-
-    return {};
+    throw std::length_error("Server returned malformed response");
 }
 
-auto client::noop(std::error_code& a_ec) noexcept -> void
+auto client::noop()
+-> void
 {
-    m_control_connection.write(noop_command(), a_ec);
-    CHECK_EC_VOID(a_ec);
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-    check_success({reply_code::OK_200}, response, a_ec);
-}
-
-auto client::download_active(
-    std::string const& a_filename,
-    std::error_code& a_ec
-) noexcept
--> std::vector<char>
-{
-    m_control_connection.write(pasv_command(), a_ec);
-
-    CHECK_EC(a_ec);
-
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
-    check_success({reply_code::OK_200, reply_code::ENTERING_PASSIVE_MODE_227}, response, a_ec);
-
-    CHECK_EC(a_ec);
-
-    auto [ip_vec, port] = parse_pasv_ipv4_port_reply(response, a_ec);
-
-    CHECK_EC(a_ec);
-
-    connection data_transfer_connection;
-    data_transfer_connection.connect(ipv4_vec_to_str(ip_vec), port, a_ec);
-
-    CHECK_EC(a_ec);
-
-    m_control_connection.write(retr_command(a_filename), a_ec);
-
-    CHECK_EC(a_ec);
-
-    response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
-    check_success({
-            reply_code::DATA_CONNECTION_OPEN_TRANSFER_STARTING_125,
-            reply_code::FILE_STATUS_OK_OPENING_DATA_CONNECTION_150
-        },
-        response, a_ec
+    m_control_connection.write(noop_command());
+    check_success(
+        {reply_code::OK_200},
+        m_control_connection.read_until(CRLF)
     );
-
-    CHECK_EC(a_ec);
-
-    std::vector<char> file_buf;
-    // TODO - Handle more transfer modes - default stream. When the server closes the
-    //        connection - the transfer is done.
-    while (true)
-    {
-        auto data = data_transfer_connection.read(65536, a_ec);
-
-        if (a_ec)
-        {
-            break;
-        }
-
-        std::copy(data.begin(), data.end(), std::back_inserter(file_buf));
-    }
-
-    if (a_ec && a_ec != std::errc::no_such_file_or_directory)
-    {
-        log_debug(a_ec.message());
-        return {};
-    } else  // NOTE - Probably caused by the server closing the connection - ignore.
-    {
-        a_ec = std::error_code{};
-    }
-
-    response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
-    check_success({reply_code::CLOSING_DATA_CONNECTION_226}, response, a_ec);
-
-    CHECK_EC(a_ec);
-
-    return file_buf;
 }
 
 auto client::download_passive(
     std::string const& a_filename,
-    std::error_code& a_ec
-) noexcept
--> std::vector<char>
+    std::function<void(std::vector<char> const&)> a_data_callback
+)
+-> void
 {
-    auto ip = resolver::resolve_v4(m_options.data_connection_host, a_ec);
 
-    CHECK_EC(a_ec);
+    connection data_transfer_connection;
+    enter_passive_mode(data_transfer_connection);
+    m_control_connection.write(retr_command(a_filename));
+    check_success(
+        {
+            reply_code::DATA_CONNECTION_OPEN_TRANSFER_STARTING_125,
+            reply_code::FILE_STATUS_OK_OPENING_DATA_CONNECTION_150
+        },
+        m_control_connection.read_until(CRLF)
+    );
 
-    auto ip_nums = parse_ipv4(ip, a_ec);
+    std::vector<char> file_buf;
+    // TODO - Handle more transfer modes - default stream. When the server closes the
+    //        connection - the transfer is done.
+    while (data_transfer_connection.is_open())
+    {
+        auto data = data_transfer_connection.read(65536);
+        a_data_callback(file_buf);
+    }
 
-    CHECK_EC(a_ec);
+    check_success(
+        {reply_code::CLOSING_DATA_CONNECTION_226},
+        m_control_connection.read_until(CRLF)
+    );
+}
+
+auto client::download_active(
+    std::string const& a_filename,
+    std::function<void(std::vector<char> const&)> a_data_callback
+)
+-> void
+{
+    auto ip = resolver::resolve_v4(m_options.data_connection_host);
+    auto ip_nums = parse_ipv4(ip);
 
     std::string h1 = std::to_string(ip_nums[0]);
     std::string h2 = std::to_string(ip_nums[1]);
@@ -729,79 +589,69 @@ auto client::download_passive(
             h4,
             p1,
             p2
-        ),
-        a_ec
+        )
     );
 
-    CHECK_EC(a_ec);
+    check_success(
+        {reply_code::OK_200},
+        m_control_connection.read_until(CRLF)
+    );
 
-    auto response = m_control_connection.read_until(CRLF, a_ec);
-
-    CHECK_EC(a_ec);
-
-    check_success({reply_code::OK_200}, response, a_ec);
-
-    CHECK_EC(a_ec);
-
-    std::promise<std::error_code> ec_promise;
-    std::future<std::error_code> ec_future = ec_promise.get_future();
-    std::thread th(&client::accept_and_read, this, std::move(ec_promise));
-    m_control_connection.write(retr_command(a_filename), a_ec);
-
-    // FIXME - If this fails, the accepting thread will just hang and we have no way to stop it.
-    if (a_ec)
+    auto accept_and_read = [&a_data_callback, this]() -> void
     {
-        a_ec = ec_future.get();
-        log_debug(a_ec.message());
+        connection data_connection;
+        data_connection.accept_v4(m_options.data_connection_port);
+        // FIXME - Read according to the transmission type. Currently only default STREAM supported.
+        data_connection.read_until(EOF);
+    };
+
+    std::thread th(accept_and_read);
+
+    try
+    {
+        m_control_connection.write(retr_command(a_filename));
+
+        check_success(
+            {
+                reply_code::DATA_CONNECTION_OPEN_TRANSFER_STARTING_125,
+                reply_code::FILE_STATUS_OK_OPENING_DATA_CONNECTION_150
+            },
+
+            m_control_connection.read_until(CRLF)
+        );
+
         th.join();
-        return {};
+    } catch (std::exception const& e)
+    {
+        log_debug(e.what());
+        if (th.joinable())
+        {
+            th.join();
+        }
     }
 
-    response = m_control_connection.read_until(CRLF, a_ec);
-
-    if (a_ec)
-    {
-        a_ec = ec_future.get();
-        log_debug(a_ec.message());
-        th.join();
-        return {};
-    }
-
-    check_success({
-        reply_code::DATA_CONNECTION_OPEN_TRANSFER_STARTING_125,
-        reply_code::FILE_STATUS_OK_OPENING_DATA_CONNECTION_150},
-        response, a_ec
+    check_success(
+        {
+            reply_code::CLOSING_DATA_CONNECTION_226,
+            reply_code::FILE_ACTION_COMPLETED_250
+        },
+        m_control_connection.read_until(CRLF)
     );
-
-    a_ec = ec_future.get();
-    th.join();
-
-    CHECK_EC(a_ec);
-
-    response = m_control_connection.read_until(CRLF, a_ec);
-    check_success({
-        reply_code::CLOSING_DATA_CONNECTION_226,
-        reply_code::FILE_ACTION_COMPLETED_250},
-        response, a_ec
-    );
-
-    return {};
 }
 
-auto client::accept_and_read(std::promise<std::error_code> a_ec) noexcept -> void
+auto client::enter_passive_mode(connection& a_data_transfer_connection)
+-> void
 {
-    connection data_connection;
-    std::error_code ec;
-    data_connection.accept_v4(m_options.data_connection_port, ec);
-
-    if (ec)
-    {
-        a_ec.set_value(ec);
-        return;
-    }
-
-    data_connection.read_until(EOF, ec);
-    a_ec.set_value(ec);
+    m_control_connection.write(pasv_command());
+    auto response = m_control_connection.read_until(CRLF);
+    check_success(
+        {
+            reply_code::OK_200,
+            reply_code::ENTERING_PASSIVE_MODE_227
+        },
+        response);
+    auto [ip_vec, port] = parse_pasv_ipv4_port_reply(response);
+    a_data_transfer_connection.connect(ipv4_vec_to_str(ip_vec), port);
 }
 
 }   // namespace ftp
