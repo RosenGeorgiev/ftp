@@ -80,52 +80,100 @@ public:
 
     /**
      * @brief
+     *
+     * @param[in] a_opts
      */
     auto set_connection_options(connection_options const& a_opts) noexcept -> void;
-
     /**
      * @brief
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws std::invalid_argument If invalid hostname or port is passed
+     * @throws boost::system::system_error If host resolution or couldn't connect to the server
      */
     auto connect() -> void;
-    /*
-    auto connect(
-        std::string const& a_hostname,
-        int a_port,
-        std::error_code& a_ec
-    ) noexcept
-    -> void;
-    */
     /**
      * @brief
+     *
+     * @param[in] a_hostname
+     * @param[in] a_port
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws std::invalid_argument If invalid hostname or port is passed
+     * @throws boost::system::system_error If host resolution or couldn't connect to the server
+     */
+    auto connect(
+        std::string const& a_hostname,
+        int a_port
+    )
+    -> void;
+    /**
+     * @brief
+     *
+     * @throws boost::system::system_error
      */
     auto close() -> void;
     /**
      * @brief
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If writing to the socket fails
      */
     auto login() -> void;
-    /*
-    auto login(
-        std::string const& a_username,
-        std::string const& a_password,
-        std::error_code& a_ec
-    ) noexcept
-    -> void;
-    */
     /**
      * @brief
+     *
+     * @param[in] a_username
+     * @param[in] a_password
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If writing to the socket fails
+     */
+    auto login(
+        std::string const& a_username,
+        std::string const& a_password
+    )
+    -> void;
+    /**
+     * @brief
+     *
+     * @param[in] a_new_wd
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If writing to the socket fails
      */
     auto cwd(std::string const& a_new_wd) -> void;
     /**
      * @brief
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If writing to the socket fails
      */
     auto cdup() -> void;
     /**
      * @brief
+     *
+     * @param[in] a_filename
+     *
+     * @throws std::runtime_error If parsing the PASV response fails
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails or data transfer
+     * connection fails.
+     *
+     * @returns std::vector<char>
      */
     auto download(std::string const& a_filename)
     -> std::vector<char>;
     /**
      * @brief
+     *
+     * @param[in] a_filename
+     * @param[out] a_ofstream
+     *
+     * @throws std::runtime_error If parsing the PASV response fails
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails or data transfer
+     * connection fails.
      */
     auto download(
         std::string const& a_filename,
@@ -134,6 +182,14 @@ public:
     -> void;
     /**
      * @brief
+     *
+     * @param[in] a_filename
+     * @param[in] a_istream
+     *
+     * @throws std::runtime_error If parsing the PASV response fails
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails or data transfer
+     * connection fails.
      */
     auto upload(
         std::string const& a_filename,
@@ -142,6 +198,12 @@ public:
     -> void;
     /**
      * @brief
+     *
+     * @param[in] a_file_to_rename
+     * @param[in] a_rename_to
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails
      */
     auto rename(
         std::string const& a_file_to_rename,
@@ -150,41 +212,91 @@ public:
     -> void;
     /**
      * @brief
+     *
+     * @param[in] a_filepath
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails
      */
     auto remove_file(std::string const& a_filepath)
     -> void;
     /**
      * @brief
+     *
+     * @param[in] a_dirpath
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails
      */
     auto rmdir(std::string const& a_dirpath)
     -> void;
     /**
      * @brief
+     *
+     * @param[in] a_dirpath
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails
      */
     auto mkdir(std::string const& a_dirpath)
     -> void;
     /**
      * @brief
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws std::length_error If the server returns a malformed response
+     * @throws boost::system::system_error If reading/writing to the socket fails
+     *
+     * @returns std::string
      */
     auto pwd() -> std::string;
     /**
      * @brief
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails or reading from
+     * the data transfer connection fails
+     *
+     * @returns std::string
      */
     auto ls() -> std::string;
     /**
      * @brief
+     *
+     * @param[in] a_pathname
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails or reading from
+     * the data transfer connection fails
+     *
+     * @returns std::string
      */
     auto ls(std::string const& a_pathname) -> std::string;
     /**
      * @brief
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws std::length_error If the server returns a malformed response
+     * @throws boost::system::system_error If reading/writing to the socket fails
+     *
+     * @returns std::string
      */
     auto system_info() -> std::string;
     /**
      * @brief
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws std::length_error If the server returns a malformed response
+     * @throws boost::system::system_error If reading/writing to the socket fails
+     *
+     * @returns std::string
      */
     auto progress() -> std::string;
     /**
      * @brief
+     *
+     * @throws std::runtime_error If the server returns an unexpected response
+     * @throws boost::system::system_error If reading/writing to the socket fails
      */
     auto noop() -> void;
 

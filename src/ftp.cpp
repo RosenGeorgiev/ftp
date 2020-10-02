@@ -260,6 +260,26 @@ auto client::connect()
     );
 }
 
+auto client::connect(
+    std::string const& a_hostname,
+    int a_port
+)
+-> void
+{
+    m_control_connection.connect(
+        a_hostname,
+        a_port
+    );
+
+    check_success(
+        {
+            reply_code::OK_200,
+            reply_code::READY_FOR_NEW_USER_220
+        },
+        m_control_connection.read_until(CRLF)
+    );
+}
+
 auto client::close()
 -> void
 {
@@ -287,6 +307,28 @@ auto client::login()
         m_control_connection.read_until(CRLF)
     );
     m_control_connection.write(password_command(m_options.password));
+    check_success(
+        {reply_code::USER_LOGGED_IN_230},
+        m_control_connection.read_until(CRLF)
+    );
+}
+
+auto client::login(
+    std::string const& a_username,
+    std::string const& a_password
+)
+-> void
+{
+    m_control_connection.write(user_command(a_username));
+    check_success(
+        {
+            reply_code::USER_LOGGED_IN_230,
+            reply_code::USERNAME_OK_NEED_PASSWORD_331,
+            reply_code::NEED_ACCOUNT_332
+        },
+        m_control_connection.read_until(CRLF)
+    );
+    m_control_connection.write(password_command(a_password));
     check_success(
         {reply_code::USER_LOGGED_IN_230},
         m_control_connection.read_until(CRLF)
