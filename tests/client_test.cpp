@@ -110,39 +110,17 @@ TEST_CASE_METHOD(logged_in_fixture, "RETR test", "[ftp][download][retr]")
     opts.data_connection_port = 50000;
     opts.debug_output = true;
 
-    SECTION("Passive")
+    m_client.set_connection_options(opts);
+
+    SECTION("Download to byte vector")
     {
-
-        opts.passive_mode = true;
-        m_client.set_connection_options(opts);
-
-        SECTION("Download to byte vector")
-        {
-            REQUIRE_NOTHROW(m_client.download("image.jpeg"));
-        }
-
-        SECTION("Download to a file")
-        {
-            std::ofstream out("image.jpeg", std::ios::binary);
-            REQUIRE_NOTHROW(m_client.download("image.jpeg", out));
-        }
+        REQUIRE_NOTHROW(m_client.download("image.jpeg"));
     }
 
-    SECTION("Active")
+    SECTION("Download to a file")
     {
-        opts.passive_mode = false;
-        m_client.set_connection_options(opts);
-
-        SECTION("Download to byte vector")
-        {
-            REQUIRE_NOTHROW(m_client.download("image.jpeg"));
-        }
-
-        SECTION("Download to a file")
-        {
-            std::ofstream out("image.jpeg", std::ios::binary);
-            REQUIRE_NOTHROW(m_client.download("image.jpeg", out));
-        }
+        std::ofstream out("image.jpeg", std::ios::binary);
+        REQUIRE_NOTHROW(m_client.download("image.jpeg", out));
     }
 }
 

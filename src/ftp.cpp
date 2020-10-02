@@ -1,6 +1,5 @@
 #include <ftp/ftp.hpp>
 
-#include <thread>
 #include <cassert>
 #include <algorithm>
 
@@ -356,20 +355,15 @@ auto client::download(std::string const& a_filename)
 -> std::vector<char>
 {
     std::vector<char> ret_data;
+
     auto data_callback = [&ret_data](std::vector<char> const& a_data) -> void
     {
         std::copy(a_data.begin(), a_data.end(), std::back_inserter(ret_data));
     };
 
-    if (m_options.passive_mode)
-    {
-        download_passive(a_filename, data_callback);
-        return ret_data;
-    } else
-    {
-        download_active(a_filename, data_callback);
-        return ret_data;
-    }
+    download_passive(a_filename, data_callback);
+
+    return ret_data;
 }
 
 auto client::download(
@@ -383,13 +377,7 @@ auto client::download(
         a_ofstream.write(reinterpret_cast<char const*>(a_data.data()), a_data.size());
     };
 
-    if (m_options.passive_mode)
-    {
-        download_passive(a_filename, data_callback);
-    } else
-    {
-        download_active(a_filename, data_callback);
-    }
+    download_passive(a_filename, data_callback);
 }
 
 auto client::upload(
@@ -631,87 +619,6 @@ auto client::download_passive(
 
     check_success(
         {reply_code::CLOSING_DATA_CONNECTION_226},
-        m_control_connection.read_until(CRLF)
-    );
-}
-
-auto client::download_active(
-    std::string const& a_filename,
-    std::function<void(std::vector<char> const&)> a_data_callback
-)
--> void
-{
-    auto ip = resolver::resolve_v4(m_options.data_connection_host);
-    auto ip_nums = parse_ipv4(ip);
-
-    std::string h1 = std::to_string(ip_nums[0]);
-    std::string h2 = std::to_string(ip_nums[1]);
-    std::string h3 = std::to_string(ip_nums[2]);
-    std::string h4 = std::to_string(ip_nums[3]);
-
-    auto network_port_repr = port_to_network(m_options.data_connection_port);
-
-    std::string p1 = std::to_string(std::get<0>(network_port_repr));
-    std::string p2 = std::to_string(std::get<1>(network_port_repr));
-
-    m_control_connection.write(
-        port_command(
-            h1,
-            h2,
-            h3,
-            h4,
-            p1,
-            p2
-        )
-    );
-
-    check_success(
-        {reply_code::OK_200},
-        m_control_connection.read_until(CRLF)
-    );
-
-    // TODO - Handle exceptions thrown here.
-    auto accept_and_read = [&a_data_callback, this]() -> void
-    {
-        connection data_connection;
-        data_connection.accept_v4(m_options.data_connection_port);
-        // FIXME - Read according to the transmission type. Currently only default STREAM supported.
-        while (true)
-        {
-            data_connection.read(65536);
-        }
-    };
-
-    std::thread th(accept_and_read);
-
-    try
-    {
-        m_control_connection.write(retr_command(a_filename));
-
-        check_success(
-            {
-                reply_code::DATA_CONNECTION_OPEN_TRANSFER_STARTING_125,
-                reply_code::FILE_STATUS_OK_OPENING_DATA_CONNECTION_150
-            },
-
-            m_control_connection.read_until(CRLF)
-        );
-
-        th.join();
-    } catch (std::exception const& e)
-    {
-        log_debug(e.what());
-        if (th.joinable())
-        {
-            th.join();
-        }
-    }
-
-    check_success(
-        {
-            reply_code::CLOSING_DATA_CONNECTION_226,
-            reply_code::FILE_ACTION_COMPLETED_250
-        },
         m_control_connection.read_until(CRLF)
     );
 }

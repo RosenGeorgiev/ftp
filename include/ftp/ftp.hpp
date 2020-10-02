@@ -25,7 +25,6 @@ struct connection_options
     unsigned short server_port{DEFAULT_DATA_CONNECTION_PORT};
     std::string data_connection_host{};
     unsigned short data_connection_port{DEFAULT_DATA_CONNECTION_PORT};
-    bool passive_mode{true};
     bool debug_output{false};
     // @Unimplemented
     data_type type{data_type::ASCII};
@@ -130,7 +129,6 @@ public:
      * @brief
      */
     auto cdup() -> void;
-
     /**
      * @brief
      */
