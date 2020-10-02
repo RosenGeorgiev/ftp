@@ -132,15 +132,6 @@ public:
     auto cdup() -> void;
 
     /**
-     * @note Not supported by vsftpd.
-     */
-    auto smnt(std::string const& a_mount_point) -> void;
-
-    /**
-     * @note Actually REIN. Logout is more descriptive of what it does. Not supported by vsftpd.
-     */
-    auto logout() -> void;
-    /**
      * @brief
      */
     auto download(std::string const& a_filename)

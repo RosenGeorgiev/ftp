@@ -100,16 +100,6 @@ TEST_CASE_METHOD(logged_in_fixture, "CWD/CDUP test", "[ftp][cwd][cdup]")
     REQUIRE_NOTHROW(m_client.cdup());
 }
 
-TEST_CASE_METHOD(logged_in_fixture, "SMNT test", "[ftp][smnt]")
-{
-    REQUIRE_NOTHROW(m_client.smnt("documents"));
-}
-
-TEST_CASE_METHOD(logged_in_fixture, "REIN test", "[ftp][rein][logout]")
-{
-    REQUIRE_NOTHROW(m_client.logout());
-}
-
 TEST_CASE_METHOD(logged_in_fixture, "RETR test", "[ftp][download][retr]")
 {
     rs::ftp::connection_options opts;

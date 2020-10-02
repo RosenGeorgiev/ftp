@@ -352,29 +352,6 @@ auto client::cdup()
     );
 }
 
-auto client::smnt(std::string const& a_mount_point)
--> void
-{
-    m_control_connection.write(smnt_command(a_mount_point));
-    check_success(
-        {
-            reply_code::NOT_IMPLEMENTED_202,
-            reply_code::FILE_ACTION_COMPLETED_250
-        },
-        m_control_connection.read_until(CRLF)
-    );
-}
-
-auto client::logout()
--> void
-{
-    m_control_connection.write(rein_command());
-    check_success(
-        {reply_code::READY_FOR_NEW_USER_220},
-        m_control_connection.read_until(CRLF)
-    );
-}
-
 auto client::download(std::string const& a_filename)
 -> std::vector<char>
 {
