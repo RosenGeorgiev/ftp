@@ -7,6 +7,7 @@
 #include <boost/asio.hpp>
 
 #include "util.hpp"
+#include "commands.hpp"
 
 
 namespace rs

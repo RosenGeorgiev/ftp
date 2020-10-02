@@ -19,7 +19,8 @@ set(STATIC_LIBRARY_TARGET ftp_static)
 set(SHARED_LIBRARY_TARGET ftp_shared)
 set(LIBRARY_PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/include/ftp/codes.hpp
                            ${CMAKE_CURRENT_LIST_DIR}/include/ftp/ftp.hpp)
-set(LIBRARY_PRIVATE_HEADERS ${CMAKE_CURRENT_LIST_DIR}/src/util.hpp)
+set(LIBRARY_PRIVATE_HEADERS ${CMAKE_CURRENT_LIST_DIR}/src/commands.hpp
+                            ${CMAKE_CURRENT_LIST_DIR}/src/util.hpp)
 set(LIBRARY_SOURCES ${CMAKE_CURRENT_LIST_DIR}/src/ftp.cpp)
 
 
