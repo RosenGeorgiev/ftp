@@ -50,9 +50,6 @@ class client
         )
         -> void;
 
-        auto accept_v4(int a_port)
-        -> void;
-
         auto close() -> void;
 
         auto read(int a_max)
@@ -75,13 +72,6 @@ class client
     private:
         struct impl;
         std::unique_ptr<impl> m_impl;
-    };
-
-    class resolver
-    {
-    public:
-        static auto resolve_v4(std::string const& a_hostname)
-        -> std::string;
     };
 
 public:

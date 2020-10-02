@@ -60,17 +60,6 @@ struct client::connection::impl
         boost::asio::connect(m_socket, endpoints);
     }
 
-    auto accept_v4(int a_port)
-    -> void
-    {
-        boost::asio::ip::tcp::acceptor acceptor(
-            m_io_context,
-            boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), a_port)
-        );
-
-        acceptor.accept(m_socket);
-    }
-
     auto close() -> void
     {
         if (!m_socket.is_open())
@@ -195,12 +184,6 @@ auto client::connection::connect(
     m_impl->connect(a_host, a_port);
 }
 
-auto client::connection::accept_v4(int a_port)
--> void
-{
-    m_impl->accept_v4(a_port);
-}
-
 auto client::connection::close() -> void
 {
     m_impl->close();
@@ -245,24 +228,6 @@ auto client::connection::is_open() noexcept
 -> bool
 {
     return m_impl->is_open();
-}
-
-auto client::resolver::resolve_v4(std::string const& a_hostname)
--> std::string
-{
-    boost::asio::io_context io_context;
-    boost::asio::ip::tcp::resolver resolver(io_context);
-    auto endpoints = resolver.resolve(a_hostname, "ftp");
-
-    for (auto it = endpoints.begin(); it != endpoints.end(); ++it)
-    {
-        if (it->endpoint().address().is_v4())
-        {
-            return it->endpoint().address().to_string();
-        }
-    }
-
-    throw std::runtime_error("Failed to resolve address");
 }
 
 client::client(connection_options const& a_opts) :
