@@ -68,6 +68,9 @@ class client
         auto write(std::string const& a_buf)
         -> void;
 
+        auto write(char const* a_buf, int a_buf_size)
+        -> void;
+
         auto is_open() noexcept -> bool;
 
     private:

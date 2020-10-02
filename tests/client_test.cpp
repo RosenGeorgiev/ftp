@@ -156,6 +156,13 @@ TEST_CASE_METHOD(logged_in_fixture, "RETR test", "[ftp][download][retr]")
     }
 }
 
+TEST_CASE_METHOD(logged_in_fixture, "Upload test", "[ftp][stor]")
+{
+    std::ifstream in("image.jpeg", std::ios::binary);
+    REQUIRE(in.is_open());
+    REQUIRE_NOTHROW(m_client.upload("pustiniaks.jpeg", in));
+}
+
 TEST_CASE_METHOD(logged_in_fixture, "Rename test", "[ftp][rnfr][rnto][rename]")
 {
     REQUIRE_NOTHROW(m_client.rename("documents/document2.txt", "documents/document22.txt"));

@@ -151,6 +151,17 @@ struct client::connection::impl
         m_socket.write_some(boost::asio::buffer(a_buf));
     }
 
+    auto write(char const* a_buf, int a_buf_size)
+    -> void
+    {
+        if (!m_socket.is_open())
+        {
+            throw std::logic_error("Writing to socket that is not connected");
+        }
+
+        m_socket.write_some(boost::asio::buffer(a_buf, a_buf_size));
+    }
+
     auto is_open() noexcept -> bool
     {
         return m_socket.is_open();
@@ -222,6 +233,12 @@ auto client::connection::write(std::string const& a_buf)
 {
     log_debug(a_buf);
     m_impl->write(a_buf);
+}
+
+auto client::connection::write(char const* a_buf, int a_buf_size)
+-> void
+{
+    m_impl->write(a_buf, a_buf_size);
 }
 
 auto client::connection::is_open() noexcept
@@ -395,6 +412,41 @@ auto client::download(
     {
         download_active(a_filename, data_callback);
     }
+}
+
+auto client::upload(
+    std::string const& a_filename,
+    std::istream& a_istream
+)
+-> void
+{
+    connection data_transfer_connection;
+    enter_passive_mode(data_transfer_connection);
+    m_control_connection.write(stor_command(a_filename));
+    check_success(
+        {
+            reply_code::DATA_CONNECTION_OPEN_TRANSFER_STARTING_125,
+            reply_code::FILE_STATUS_OK_OPENING_DATA_CONNECTION_150
+        },
+        m_control_connection.read_until(CRLF)
+    );
+
+    char buf[8192];
+    while (!a_istream.eof())
+    {
+        a_istream.read(buf, 8192);
+        data_transfer_connection.write(buf, a_istream.gcount());
+    }
+
+    data_transfer_connection.close();
+
+    check_success(
+        {
+            reply_code::CLOSING_DATA_CONNECTION_226,
+            reply_code::FILE_ACTION_COMPLETED_250
+        },
+        m_control_connection.read_until(CRLF)
+    );
 }
 
 auto client::rename(
