@@ -56,7 +56,12 @@ struct client::connection::impl
         }
 
         boost::asio::ip::tcp::resolver resolver(m_io_context);
-        auto endpoints = resolver.resolve(a_hostname, std::to_string(a_port));
+        boost::asio::ip::tcp::resolver::query query(
+            a_hostname,
+            std::to_string(a_port),
+            boost::asio::ip::tcp::resolver::query::numeric_service
+        );
+        auto endpoints = resolver.resolve(query);
         boost::asio::connect(m_socket, endpoints);
     }
 
