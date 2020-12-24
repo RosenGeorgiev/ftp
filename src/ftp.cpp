@@ -22,10 +22,12 @@ struct client::connection::impl
     boost::asio::ip::tcp::socket m_socket;
     boost::asio::deadline_timer m_timer;
     boost::system::error_code m_ec;
+    std::chrono::milliseconds m_timeout;
 
     impl() :
         m_socket(m_io_context),
-        m_timer(m_io_context)
+        m_timer(m_io_context),
+        m_timeout(60)
     { }
 
     ~impl() noexcept
@@ -69,10 +71,10 @@ struct client::connection::impl
         }
     }
 
-    auto start_timer(std::chrono::milliseconds const& a_timeout) -> void
+    auto start_timer() -> void
     {
         m_timer.cancel();
-        m_timer.expires_from_now(boost::posix_time::milliseconds(a_timeout.count()));
+        m_timer.expires_from_now(boost::posix_time::milliseconds(m_timeout.count()));
         m_timer.async_wait([this](boost::system::error_code const& a_ec) -> void
         {
             // NOTE - Timer timed out.
@@ -97,6 +99,8 @@ struct client::connection::impl
     )
     -> void
     {
+        m_timeout = a_timeout;
+
         if (a_port < 0 || a_hostname.empty())
         {
             assert(false && "negative port number or empty hostname");
@@ -150,7 +154,7 @@ struct client::connection::impl
             }
         );
 
-        start_timer(a_timeout);
+        start_timer();
         run_event_loop();
         handle_error();
     }
@@ -167,10 +171,7 @@ struct client::connection::impl
         m_socket.close();
     }
 
-    auto read(
-        int a_max,
-        std::chrono::milliseconds const& a_timeout
-    )
+    auto read(int a_max)
     -> std::vector<char>
     {
         if (!m_socket.is_open())
@@ -200,7 +201,7 @@ struct client::connection::impl
             }
         );
 
-        start_timer(a_timeout);
+        start_timer();
         run_event_loop();
         handle_error();
 
@@ -216,11 +217,30 @@ struct client::connection::impl
         }
 
         std::vector<char> buf;
-        boost::asio::read_until(
+
+        boost::asio::async_read_until(
             m_socket,
             boost::asio::dynamic_buffer(buf),
-            a_delimiter
+            a_delimiter,
+            [this](
+                boost::system::error_code const& a_ec,
+                [[ maybe_unused ]] size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                }
+            }
         );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
+
         return std::string(buf.begin(), buf.end());
     }
 
@@ -233,11 +253,30 @@ struct client::connection::impl
         }
 
         std::vector<char> buf;
-        boost::asio::read_until(
+
+        boost::asio::async_read_until(
             m_socket,
             boost::asio::dynamic_buffer(buf),
-            a_delimiter
+            a_delimiter,
+            [this](
+                boost::system::error_code const& a_ec,
+                [[ maybe_unused ]] size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                }
+            }
         );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
+
         return std::string(buf.begin(), buf.end());
     }
 
@@ -249,7 +288,27 @@ struct client::connection::impl
             throw std::logic_error("Writing to socket that is not connected");
         }
 
-        boost::asio::write(m_socket, boost::asio::buffer(a_buf));
+        boost::asio::async_write(
+            m_socket,
+            boost::asio::buffer(a_buf),
+            [this](
+                boost::system::error_code const& a_ec,
+                [[ maybe_unused ]] size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                }
+            }
+        );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
     }
 
     auto write(char const* a_buf, int a_buf_size)
@@ -260,7 +319,27 @@ struct client::connection::impl
             throw std::logic_error("Writing to socket that is not connected");
         }
 
-        boost::asio::write(m_socket, boost::asio::buffer(a_buf, a_buf_size));
+        boost::asio::async_write(
+            m_socket,
+            boost::asio::buffer(a_buf, a_buf_size),
+            [this](
+                boost::system::error_code const& a_ec,
+                [[ maybe_unused ]] size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                }
+            }
+        );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
     }
 
     auto is_open() noexcept -> bool
@@ -302,13 +381,10 @@ auto client::connection::close() -> void
     m_impl->close();
 }
 
-auto client::connection::read(
-    int a_max,
-    std::chrono::milliseconds const& a_timeout
-)
+auto client::connection::read(int a_max)
 -> std::vector<char>
 {
-    return m_impl->read(a_max, a_timeout);
+    return m_impl->read(a_max);
 }
 
 auto client::connection::read_until(std::string const& a_delimiter)
@@ -373,13 +449,13 @@ auto client::set_connection_options(connection_options const& a_opts) noexcept
     set_log_level(a_opts.debug_output);
 }
 
-auto client::connect(std::chrono::milliseconds const& a_timeout)
+auto client::connect()
 -> void
 {
     m_control_connection.connect(
         m_options.server_hostname,
         m_options.server_port,
-        a_timeout
+        m_options.timeout
     );
 
     check_success(
@@ -393,15 +469,14 @@ auto client::connect(std::chrono::milliseconds const& a_timeout)
 
 auto client::connect(
     std::string const& a_hostname,
-    int a_port,
-    std::chrono::milliseconds const& a_timeout
+    int a_port
 )
 -> void
 {
     m_control_connection.connect(
         a_hostname,
         a_port,
-        a_timeout
+        m_options.timeout
     );
 
     check_success(
@@ -491,10 +566,7 @@ auto client::cdup()
     );
 }
 
-auto client::download(
-    std::string const& a_filename,
-    std::chrono::milliseconds const& a_timeout
-)
+auto client::download(std::string const& a_filename)
 -> std::vector<char>
 {
     std::vector<char> ret_data;
@@ -504,15 +576,14 @@ auto client::download(
         std::copy(a_data.begin(), a_data.end(), std::back_inserter(ret_data));
     };
 
-    download_passive(a_filename, data_callback, a_timeout);
+    download_passive(a_filename, data_callback);
 
     return ret_data;
 }
 
 auto client::download(
     std::string const& a_filename,
-    std::ofstream& a_ofstream,
-    std::chrono::milliseconds const& a_timeout
+    std::ofstream& a_ofstream
 )
 -> void
 {
@@ -521,18 +592,17 @@ auto client::download(
         a_ofstream.write(reinterpret_cast<char const*>(a_data.data()), a_data.size());
     };
 
-    download_passive(a_filename, data_callback, a_timeout);
+    download_passive(a_filename, data_callback);
 }
 
 auto client::upload(
     std::string const& a_filename,
-    std::istream& a_istream,
-    std::chrono::milliseconds const& a_timeout
+    std::istream& a_istream
 )
 -> void
 {
     connection data_transfer_connection;
-    enter_passive_mode(data_transfer_connection, a_timeout);
+    enter_passive_mode(data_transfer_connection);
     m_control_connection.write(stor_command(a_filename));
     check_success(
         {
@@ -628,11 +698,11 @@ auto client::pwd()
     throw std::length_error("Server returned malformed response");
 }
 
-auto client::ls(std::chrono::milliseconds const& a_timeout)
+auto client::ls()
 -> std::string
 {
     connection data_transfer_connection;
-    enter_passive_mode(data_transfer_connection, a_timeout);
+    enter_passive_mode(data_transfer_connection);
     m_control_connection.write(nlst_command());
     check_success(
         {
@@ -652,14 +722,11 @@ auto client::ls(std::chrono::milliseconds const& a_timeout)
     return response;
 }
 
-auto client::ls(
-    std::string const& a_pathname,
-    std::chrono::milliseconds const& a_timeout
-)
+auto client::ls(std::string const& a_pathname)
 -> std::string
 {
     connection data_transfer_connection;
-    enter_passive_mode(data_transfer_connection, a_timeout);
+    enter_passive_mode(data_transfer_connection);
     m_control_connection.write(nlst_command(a_pathname));
     check_success(
         {
@@ -735,14 +802,13 @@ auto client::noop()
 
 auto client::download_passive(
     std::string const& a_filename,
-    std::function<void(std::vector<char> const&)> a_data_callback,
-    std::chrono::milliseconds const& a_timeout
+    std::function<void(std::vector<char> const&)> a_data_callback
 )
 -> void
 {
 
     connection data_transfer_connection;
-    enter_passive_mode(data_transfer_connection, a_timeout);
+    enter_passive_mode(data_transfer_connection);
     m_control_connection.write(retr_command(a_filename));
     check_success(
         {
@@ -759,7 +825,7 @@ auto client::download_passive(
     {
         try
         {
-            a_data_callback(data_transfer_connection.read(65536, a_timeout));
+            a_data_callback(data_transfer_connection.read(65536));
         } catch (end_of_file_error const& e)
         {
             break;
@@ -772,10 +838,7 @@ auto client::download_passive(
     );
 }
 
-auto client::enter_passive_mode(
-    connection& a_data_transfer_connection,
-    std::chrono::milliseconds const& a_timeout
-)
+auto client::enter_passive_mode(connection& a_data_transfer_connection)
 -> void
 {
     m_control_connection.write(pasv_command());
@@ -787,7 +850,11 @@ auto client::enter_passive_mode(
         },
         response);
     auto [ip_vec, port] = parse_pasv_ipv4_port_reply(response);
-    a_data_transfer_connection.connect(ipv4_vec_to_str(ip_vec), port, a_timeout);
+    a_data_transfer_connection.connect(
+        ipv4_vec_to_str(ip_vec),
+        port,
+        m_options.timeout
+    );
 }
 
 }   // namespace ftp
