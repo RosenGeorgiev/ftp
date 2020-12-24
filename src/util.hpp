@@ -9,9 +9,10 @@
 #include <vector>
 #include <sstream>
 #include <cassert>
-#include <iostream>
 #include <exception>
 #include <algorithm>
+
+#include "logger.hpp"
 
 
 namespace rs
@@ -22,13 +23,6 @@ namespace ftp
 static std::regex const codes_regex{"(\\d{3})"};
 static std::regex const ipv4_regex{R"###((\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}))###"};
 static std::regex const pasv_reply_regex{R"###(\((\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})\))###"};
-
-inline auto log_debug(std::string const& a_log_str) noexcept -> void
-{
-#if 1
-    std::cout << a_log_str << std::endl;
-#endif
-}
 
 inline auto parse_codes(
     std::string const& a_reply_str
@@ -90,7 +84,7 @@ inline auto parse_ipv4(
         throw std::runtime_error("Failed to parse IP address");
     }
 
-    log_debug(ip_match[0]);
+    logger::debug(ip_match[0]);
 
     return {
         std::stoi(ip_match[1]),

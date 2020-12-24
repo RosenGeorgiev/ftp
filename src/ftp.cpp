@@ -6,6 +6,7 @@
 #include <boost/asio.hpp>
 
 #include "util.hpp"
+#include "logger.hpp"
 #include "commands.hpp"
 
 
@@ -32,7 +33,7 @@ struct client::connection::impl
                 close();
             } catch (std::exception const& e)
             {
-                log_debug(e.what());
+                logger::error(e.what());
             }
         }
     }
@@ -69,7 +70,7 @@ struct client::connection::impl
     {
         if (!m_socket.is_open())
         {
-            log_debug("Closing a non-opened socket!");
+            logger::error("Closing a non-opened socket!");
             return;
         }
 
@@ -176,7 +177,7 @@ client::connection::~connection() noexcept
             close();
         } catch (std::exception const& e)
         {
-            log_debug(e.what());
+            logger::error(e.what());
         }
     }
 }
@@ -205,7 +206,7 @@ auto client::connection::read_until(std::string const& a_delimiter)
 -> std::string
 {
     auto result = m_impl->read_until(a_delimiter);
-    log_debug(result);
+    logger::debug(result);
     return result;
 }
 
@@ -213,14 +214,14 @@ auto client::connection::read_until(char a_delimiter)
 -> std::string
 {
     auto result = m_impl->read_until(a_delimiter);
-    log_debug(result);
+    logger::debug(result);
     return result;
 }
 
 auto client::connection::write(std::string const& a_buf)
 -> void
 {
-    log_debug(a_buf);
+    logger::debug(a_buf);
     m_impl->write(a_buf);
 }
 
@@ -236,17 +237,31 @@ auto client::connection::is_open() noexcept
     return m_impl->is_open();
 }
 
+static auto set_log_level(bool a_debug) -> void
+{
+    if (a_debug)
+    {
+        logger::set_log_level(log_level::DEBUG);
+    } else
+    {
+        logger::set_log_level(log_level::ERROR);
+    }
+}
+
 client::client(connection_options const& a_opts) :
     m_options(a_opts)
 {
     assert(!a_opts.server_hostname.empty() && "empty hostname");
     assert(a_opts.server_port > 0 && "negative server port");
+
+    set_log_level(a_opts.debug_output);
 }
 
 auto client::set_connection_options(connection_options const& a_opts) noexcept
 -> void
 {
     m_options = a_opts;
+    set_log_level(a_opts.debug_output);
 }
 
 auto client::connect()
@@ -489,7 +504,7 @@ auto client::pwd()
     if (response.size() > 4)
     {
         auto ret{response.substr(4)};
-        log_debug(ret);
+        logger::debug(ret);
         return ret;
     }
 
@@ -557,7 +572,7 @@ auto client::system_info()
     if (response.size() > 4)
     {
         auto ret{response.substr(4)};
-        log_debug(ret);
+        logger::debug(ret);
         return ret;
     }
 
@@ -581,7 +596,7 @@ auto client::progress()
     if (response.size() > 4)
     {
         auto ret{response.substr(4)};
-        log_debug(ret);
+        logger::debug(ret);
         return ret;
     }
 

@@ -26,6 +26,11 @@ struct connection_options
     // Unused due to the lack of active mode support
     // std::string data_connection_host{};
     // unsigned short data_connection_port{DEFAULT_DATA_CONNECTION_PORT};
+    /**
+     * Prints all the correspondence between the server and the client.
+     *
+     * @warning Affects all instances of the class.
+     */
     bool debug_output{false};
     // @Unimplemented
     data_type type{data_type::ASCII};
