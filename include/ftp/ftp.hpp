@@ -60,7 +60,10 @@ class client
 
         auto close() -> void;
 
-        auto read(int a_max)
+        auto read(
+            int a_max,
+            std::chrono::milliseconds const& a_timeout
+        )
         -> std::vector<char>;
 
         auto read_until(std::string const& a_delimiter)

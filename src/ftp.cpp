@@ -42,9 +42,31 @@ struct client::connection::impl
         }
     }
 
-    auto clean_old_ec()
+    auto run_event_loop() -> void
     {
-        m_ec = boost::system::error_code();
+        m_io_context.reset();
+        m_io_context.run();
+    }
+
+    auto handle_error() -> void
+    {
+        if (m_ec)
+        {
+            auto ec = m_ec;
+
+            m_ec = boost::system::error_code();
+
+            if (ec == boost::asio::error::timed_out)
+            {
+                throw timeout_error(ec.message());
+            } else if (ec == boost::asio::error::eof)
+            {
+                throw end_of_file_error(ec.message());
+            } else
+            {
+                throw std::runtime_error(ec.message());
+            }
+        }
     }
 
     auto start_timer(std::chrono::milliseconds const& a_timeout) -> void
@@ -56,12 +78,12 @@ struct client::connection::impl
             // NOTE - Timer timed out.
             if (!a_ec)
             {
+                boost::system::error_code ignored_ec;
+                m_socket.cancel(ignored_ec);
                 m_ec = boost::asio::error::timed_out;
-                m_socket.cancel(m_ec);  // FIXME - Potential error shadowing
             } else if (a_ec && a_ec != boost::asio::error::operation_aborted)
             {
                 m_ec = a_ec;
-                logger::error(a_ec.message());
             }
 
             // NOTE - Timer got closed by operation completed in time/error in operation.
@@ -93,43 +115,44 @@ struct client::connection::impl
             std::to_string(a_port),
             boost::asio::ip::tcp::resolver::query::numeric_service
         );
-        // TODO - Async resolve
-        auto endpoints = resolver.resolve(query);
-        boost::asio::async_connect(
-            m_socket,
-            endpoints,
+        resolver.async_resolve(
+            query,
             [this](
                 boost::system::error_code const& a_ec,
-                [[ maybe_unused ]] auto& a_endpoint
-            )
+                boost::asio::ip::tcp::resolver::results_type a_results
+            ) -> void
             {
-                m_timer.cancel(m_ec);
-                // NOTE - We have an error and it was not a timeout.
-                // FIXME - Potential error shadowing
                 if (a_ec && a_ec != boost::asio::error::operation_aborted)
                 {
+                    boost::system::error_code ignored_ec;
+                    m_timer.cancel(ignored_ec);
                     m_ec = a_ec;
+                    return;
                 }
+
+                boost::asio::async_connect(
+                    m_socket,
+                    a_results,
+                    [this](
+                        boost::system::error_code const& a_ec,
+                        [[ maybe_unused ]] auto& a_endpoint
+                    )
+                    {
+                        boost::system::error_code ignored_ec;
+                        m_timer.cancel(ignored_ec);
+                        // NOTE - We have an error and it was not a timeout.
+                        if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                        {
+                            m_ec = a_ec;
+                        }
+                    }
+                );
             }
         );
 
         start_timer(a_timeout);
-
-        m_io_context.run();
-
-        if (m_ec)
-        {
-            auto ec = m_ec;
-            clean_old_ec();
-
-            if (ec == boost::asio::error::timed_out)
-            {
-                throw timeout_error("Connection timed out!");
-            } else
-            {
-                throw std::runtime_error(ec.message());
-            }
-        }
+        run_event_loop();
+        handle_error();
     }
 
     auto close() -> void
@@ -144,7 +167,10 @@ struct client::connection::impl
         m_socket.close();
     }
 
-    auto read(int a_max)
+    auto read(
+        int a_max,
+        std::chrono::milliseconds const& a_timeout
+    )
     -> std::vector<char>
     {
         if (!m_socket.is_open())
@@ -152,20 +178,33 @@ struct client::connection::impl
             throw std::logic_error("Reading from socket that is not connected");
         }
 
-        try
-        {
-            std::vector<char> buf(a_max);
-            m_socket.read_some(boost::asio::buffer(buf));
-            return buf;
-        } catch (boost::system::system_error const& e)
-        {
-            if (e.code() == boost::asio::error::eof)
-            {
-                throw end_of_file_error("Connection reset by peer");
-            }
+        std::vector<char> buf(a_max);
 
-            throw;
-        }
+        m_socket.async_read_some(
+            boost::asio::buffer(buf, a_max),
+            [this, &buf](
+                boost::system::error_code const& a_ec,
+                size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                    return;
+                }
+
+                buf.resize(a_bytes_transferred);
+            }
+        );
+
+        start_timer(a_timeout);
+        run_event_loop();
+        handle_error();
+
+        return buf;
     }
 
     auto read_until(std::string const& a_delimiter)
@@ -263,10 +302,13 @@ auto client::connection::close() -> void
     m_impl->close();
 }
 
-auto client::connection::read(int a_max)
+auto client::connection::read(
+    int a_max,
+    std::chrono::milliseconds const& a_timeout
+)
 -> std::vector<char>
 {
-    return m_impl->read(a_max);
+    return m_impl->read(a_max, a_timeout);
 }
 
 auto client::connection::read_until(std::string const& a_delimiter)
@@ -717,7 +759,7 @@ auto client::download_passive(
     {
         try
         {
-            a_data_callback(data_transfer_connection.read(65536));
+            a_data_callback(data_transfer_connection.read(65536, a_timeout));
         } catch (end_of_file_error const& e)
         {
             break;
