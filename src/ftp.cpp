@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include <boost/asio.hpp>
+#include <boost/asio/deadline_timer.hpp>
 
 #include "util.hpp"
 #include "logger.hpp"
@@ -19,9 +20,14 @@ struct client::connection::impl
 {
     boost::asio::io_context m_io_context;
     boost::asio::ip::tcp::socket m_socket;
+    boost::asio::deadline_timer m_timer;
+    boost::system::error_code m_ec;
+    std::chrono::milliseconds m_timeout;
 
     impl() :
-        m_socket(m_io_context)
+        m_socket(m_io_context),
+        m_timer(m_io_context),
+        m_timeout(60000)
     { }
 
     ~impl() noexcept
@@ -38,12 +44,63 @@ struct client::connection::impl
         }
     }
 
+    auto run_event_loop() -> void
+    {
+        m_io_context.reset();
+        m_io_context.run();
+    }
+
+    auto handle_error() -> void
+    {
+        if (m_ec)
+        {
+            auto ec = m_ec;
+
+            m_ec = boost::system::error_code();
+
+            if (ec == boost::asio::error::timed_out)
+            {
+                throw timeout_error(ec.message());
+            } else if (ec == boost::asio::error::eof)
+            {
+                throw end_of_file_error(ec.message());
+            } else
+            {
+                throw std::runtime_error(ec.message());
+            }
+        }
+    }
+
+    auto start_timer() -> void
+    {
+        m_timer.cancel();
+        m_timer.expires_from_now(boost::posix_time::milliseconds(m_timeout.count()));
+        m_timer.async_wait([this](boost::system::error_code const& a_ec) -> void
+        {
+            // NOTE - Timer timed out.
+            if (!a_ec)
+            {
+                boost::system::error_code ignored_ec;
+                m_socket.cancel(ignored_ec);
+                m_ec = boost::asio::error::timed_out;
+            } else if (a_ec && a_ec != boost::asio::error::operation_aborted)
+            {
+                m_ec = a_ec;
+            }
+
+            // NOTE - Timer got closed by operation completed in time/error in operation.
+        });
+    }
+
     auto connect(
         std::string const& a_hostname,
-        int a_port
+        int a_port,
+        std::chrono::milliseconds const& a_timeout
     )
     -> void
     {
+        m_timeout = a_timeout;
+
         if (a_port < 0 || a_hostname.empty())
         {
             assert(false && "negative port number or empty hostname");
@@ -62,8 +119,44 @@ struct client::connection::impl
             std::to_string(a_port),
             boost::asio::ip::tcp::resolver::query::numeric_service
         );
-        auto endpoints = resolver.resolve(query);
-        boost::asio::connect(m_socket, endpoints);
+        resolver.async_resolve(
+            query,
+            [this](
+                boost::system::error_code const& a_ec,
+                boost::asio::ip::tcp::resolver::results_type a_results
+            ) -> void
+            {
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    boost::system::error_code ignored_ec;
+                    m_timer.cancel(ignored_ec);
+                    m_ec = a_ec;
+                    return;
+                }
+
+                boost::asio::async_connect(
+                    m_socket,
+                    a_results,
+                    [this](
+                        boost::system::error_code const& a_ec,
+                        [[ maybe_unused ]] auto& a_endpoint
+                    )
+                    {
+                        boost::system::error_code ignored_ec;
+                        m_timer.cancel(ignored_ec);
+                        // NOTE - We have an error and it was not a timeout.
+                        if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                        {
+                            m_ec = a_ec;
+                        }
+                    }
+                );
+            }
+        );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
     }
 
     auto close() -> void
@@ -86,20 +179,33 @@ struct client::connection::impl
             throw std::logic_error("Reading from socket that is not connected");
         }
 
-        try
-        {
-            std::vector<char> buf(a_max);
-            m_socket.read_some(boost::asio::buffer(buf));
-            return buf;
-        } catch (boost::system::system_error const& e)
-        {
-            if (e.code() == boost::asio::error::eof)
-            {
-                throw end_of_file_error("Connection reset by peer");
-            }
+        std::vector<char> buf(a_max);
 
-            throw;
-        }
+        m_socket.async_read_some(
+            boost::asio::buffer(buf, a_max),
+            [this, &buf](
+                boost::system::error_code const& a_ec,
+                size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                    return;
+                }
+
+                buf.resize(a_bytes_transferred);
+            }
+        );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
+
+        return buf;
     }
 
     auto read_until(std::string const& a_delimiter)
@@ -111,11 +217,30 @@ struct client::connection::impl
         }
 
         std::vector<char> buf;
-        boost::asio::read_until(
+
+        boost::asio::async_read_until(
             m_socket,
             boost::asio::dynamic_buffer(buf),
-            a_delimiter
+            a_delimiter,
+            [this](
+                boost::system::error_code const& a_ec,
+                [[ maybe_unused ]] size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                }
+            }
         );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
+
         return std::string(buf.begin(), buf.end());
     }
 
@@ -128,11 +253,30 @@ struct client::connection::impl
         }
 
         std::vector<char> buf;
-        boost::asio::read_until(
+
+        boost::asio::async_read_until(
             m_socket,
             boost::asio::dynamic_buffer(buf),
-            a_delimiter
+            a_delimiter,
+            [this](
+                boost::system::error_code const& a_ec,
+                [[ maybe_unused ]] size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                }
+            }
         );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
+
         return std::string(buf.begin(), buf.end());
     }
 
@@ -144,7 +288,27 @@ struct client::connection::impl
             throw std::logic_error("Writing to socket that is not connected");
         }
 
-        boost::asio::write(m_socket, boost::asio::buffer(a_buf));
+        boost::asio::async_write(
+            m_socket,
+            boost::asio::buffer(a_buf),
+            [this](
+                boost::system::error_code const& a_ec,
+                [[ maybe_unused ]] size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                }
+            }
+        );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
     }
 
     auto write(char const* a_buf, int a_buf_size)
@@ -155,7 +319,27 @@ struct client::connection::impl
             throw std::logic_error("Writing to socket that is not connected");
         }
 
-        boost::asio::write(m_socket, boost::asio::buffer(a_buf, a_buf_size));
+        boost::asio::async_write(
+            m_socket,
+            boost::asio::buffer(a_buf, a_buf_size),
+            [this](
+                boost::system::error_code const& a_ec,
+                [[ maybe_unused ]] size_t a_bytes_transferred
+            ) -> void
+            {
+                boost::system::error_code ignored_ec;
+                m_timer.cancel(ignored_ec);
+
+                if (a_ec && a_ec != boost::asio::error::operation_aborted)
+                {
+                    m_ec = a_ec;
+                }
+            }
+        );
+
+        start_timer();
+        run_event_loop();
+        handle_error();
     }
 
     auto is_open() noexcept -> bool
@@ -184,11 +368,12 @@ client::connection::~connection() noexcept
 
 auto client::connection::connect(
     std::string const& a_host,
-    int a_port
+    int a_port,
+    std::chrono::milliseconds const& a_timeout
 )
 -> void
 {
-    m_impl->connect(a_host, a_port);
+    m_impl->connect(a_host, a_port, a_timeout);
 }
 
 auto client::connection::close() -> void
@@ -269,7 +454,8 @@ auto client::connect()
 {
     m_control_connection.connect(
         m_options.server_hostname,
-        m_options.server_port
+        m_options.server_port,
+        m_options.timeout
     );
 
     check_success(
@@ -289,7 +475,8 @@ auto client::connect(
 {
     m_control_connection.connect(
         a_hostname,
-        a_port
+        a_port,
+        m_options.timeout
     );
 
     check_success(
@@ -663,7 +850,11 @@ auto client::enter_passive_mode(connection& a_data_transfer_connection)
         },
         response);
     auto [ip_vec, port] = parse_pasv_ipv4_port_reply(response);
-    a_data_transfer_connection.connect(ipv4_vec_to_str(ip_vec), port);
+    a_data_transfer_connection.connect(
+        ipv4_vec_to_str(ip_vec),
+        port,
+        m_options.timeout
+    );
 }
 
 }   // namespace ftp

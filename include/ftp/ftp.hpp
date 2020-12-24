@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <vector>
+#include <chrono>
 #include <fstream>
 #include <exception>
 #include <functional>
@@ -32,6 +33,7 @@ struct connection_options
      * @warning Affects all instances of the class.
      */
     bool debug_output{false};
+    std::chrono::milliseconds timeout{60000};
     // @Unimplemented
     data_type type{data_type::ASCII};
     // @Unimplemented
@@ -52,7 +54,8 @@ class client
 
         auto connect(
             std::string const& a_hostname,
-            int a_port
+            int a_port,
+            std::chrono::milliseconds const& a_timeout
         )
         -> void;
 
@@ -342,6 +345,18 @@ public:
     { }
 
     explicit end_of_file_error(char const* a_msg) :
+        std::runtime_error(a_msg)
+    { }
+};
+
+class timeout_error : public std::runtime_error
+{
+public:
+    explicit timeout_error(std::string const& a_msg) :
+        std::runtime_error(a_msg)
+    { }
+
+    explicit timeout_error(char const* a_msg) :
         std::runtime_error(a_msg)
     { }
 };
