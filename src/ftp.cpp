@@ -68,6 +68,7 @@ struct client::connection::impl
             return;
         }
 
+        m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_type::shutdown_both);
         m_socket.close();
     }
 
