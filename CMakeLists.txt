@@ -7,7 +7,7 @@ project(ftp VERSION 0.1.0
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED yes)
 
-find_package(Boost 1.72 REQUIRED COMPONENTS system log)
+find_package(Boost 1.72 REQUIRED COMPONENTS system)
 
 if (NOT Boost_FOUND)
     message(FATAL "Failed to find Boost ASIO! Terminating!")
@@ -27,14 +27,14 @@ set(LIBRARY_SOURCES ${CMAKE_CURRENT_LIST_DIR}/src/ftp.cpp)
 add_library(${STATIC_LIBRARY_TARGET} STATIC ${LIBRARY_PUBLIC_HEADERS} ${LIBRARY_PRIVATE_HEADERS} ${LIBRARY_SOURCES})
 target_include_directories(${STATIC_LIBRARY_TARGET} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include
                                                     PRIVATE ${Boost_INCLUDE_DIRS})
-target_link_libraries(${STATIC_LIBRARY_TARGET} PRIVATE Boost::system Boost::log Threads::Threads)
+target_link_libraries(${STATIC_LIBRARY_TARGET} PRIVATE Boost::system Threads::Threads)
 
 add_library(ftp::ftp_static ALIAS ${STATIC_LIBRARY_TARGET})
 
 add_library(${SHARED_LIBRARY_TARGET} SHARED ${LIBRARY_PUBLIC_HEADERS} ${LIBRARY_PRIVATE_HEADERS} ${LIBRARY_SOURCES})
 target_include_directories(${SHARED_LIBRARY_TARGET} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include
                                                     PRIVATE ${Boost_INCLUDE_DIRS})
-target_link_libraries(${SHARED_LIBRARY_TARGET} PRIVATE Boost::system Boost::log Threads::Threads)
+target_link_libraries(${SHARED_LIBRARY_TARGET} PRIVATE Boost::system Threads::Threads)
 
 add_library(ftp::ftp_shared ALIAS ${STATIC_LIBRARY_TARGET})
 
