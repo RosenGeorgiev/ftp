@@ -36,7 +36,7 @@ target_include_directories(${SHARED_LIBRARY_TARGET} PUBLIC ${CMAKE_CURRENT_LIST_
                                                     PRIVATE ${Boost_INCLUDE_DIRS})
 target_link_libraries(${SHARED_LIBRARY_TARGET} PRIVATE Boost::system Threads::Threads)
 
-add_library(ftp::ftp_shared ALIAS ${STATIC_LIBRARY_TARGET})
+add_library(ftp::ftp_shared ALIAS ${SHARED_LIBRARY_TARGET})
 
 option(FTP_ENABLE_TESTS "Built the FTP client library tests" ON)
 
