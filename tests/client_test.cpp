@@ -27,7 +27,6 @@ protected:
     rs::ftp::client m_client;
 };
 
-
 TEST_CASE("Connection test", "[ftp][connect]")
 {
     SECTION("Successful connection")
