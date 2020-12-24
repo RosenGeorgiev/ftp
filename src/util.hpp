@@ -19,6 +19,7 @@ namespace rs
 namespace ftp
 {
 
+static std::regex const codes_regex{"(\\d{3})"};
 static std::regex const ipv4_regex{R"###((\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}))###"};
 static std::regex const pasv_reply_regex{R"###(\((\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})\))###"};
 
@@ -34,7 +35,6 @@ inline auto parse_codes(
 ) noexcept
 -> std::vector<reply_code>
 {
-    static std::regex const codes_regex{"(\\d{3})"};
     std::smatch codes_match;
     std::vector<reply_code> ret_codes;
     std::string search_str{a_reply_str};
