@@ -15,7 +15,6 @@ public:
         opts.password = "admin";
         opts.server_hostname = "localhost";
         opts.server_port = 21;
-        opts.data_connection_port = 50000;
         opts.debug_output = true;
 
         m_client.set_connection_options(opts);
@@ -107,7 +106,6 @@ TEST_CASE_METHOD(logged_in_fixture, "RETR test", "[ftp][download][retr]")
     opts.password = "admin";
     opts.server_hostname = "localhost";
     opts.server_port = 21;
-    opts.data_connection_port = 50000;
     opts.debug_output = true;
 
     m_client.set_connection_options(opts);
