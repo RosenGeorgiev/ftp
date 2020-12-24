@@ -27,7 +27,7 @@ struct client::connection::impl
     impl() :
         m_socket(m_io_context),
         m_timer(m_io_context),
-        m_timeout(60)
+        m_timeout(60000)
     { }
 
     ~impl() noexcept
