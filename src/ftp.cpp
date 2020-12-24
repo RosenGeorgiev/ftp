@@ -138,7 +138,7 @@ struct client::connection::impl
             throw std::logic_error("Writing to socket that is not connected");
         }
 
-        m_socket.write_some(boost::asio::buffer(a_buf));
+        boost::asio::write(m_socket, boost::asio::buffer(a_buf));
     }
 
     auto write(char const* a_buf, int a_buf_size)
@@ -149,7 +149,7 @@ struct client::connection::impl
             throw std::logic_error("Writing to socket that is not connected");
         }
 
-        m_socket.write_some(boost::asio::buffer(a_buf, a_buf_size));
+        boost::asio::write(m_socket, boost::asio::buffer(a_buf, a_buf_size));
     }
 
     auto is_open() noexcept -> bool
