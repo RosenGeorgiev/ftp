@@ -109,13 +109,62 @@ enum class block_header_descriptor_codes
     END_OF_DATA_BLOCK_IS_EOR = 128,
 };
 
+enum class data_channel_protection_level
+{
+    CLEAR,
+    SAFE,
+    CONFIDENTIAL,
+    PRIVATE,
+};
+
+inline auto data_channel_protection_level_to_str(data_channel_protection_level a_protection_level) noexcept -> std::string
+{
+    switch (a_protection_level)
+    {
+    case data_channel_protection_level::CLEAR:
+        return "C";
+    case data_channel_protection_level::SAFE:
+        return "S";
+    case data_channel_protection_level::CONFIDENTIAL:
+        return "E";
+    case data_channel_protection_level::PRIVATE:
+        return "P";
+    default:
+        return "unknown data channel protection level";
+    }
+}
+
+enum class authentication_method
+{
+    TLS,
+};
+
+inline auto authentication_method_to_str(authentication_method a_auth_method)
+{
+    switch (a_auth_method)
+    {
+    case authentication_method::TLS:
+        return "TLS";
+    default:
+        return "unknown authentication method";
+    }
+}
+
 enum class ftp_command
 {
+    /**
+     * RFC959 commands
+     */
     /**
      * 230
      * 530
      * 500, 501, 421
      * 331, 332
+     *
+     * Added by RFC2228
+     *
+     * 232
+     * 336
      */
     USER,
     /**
@@ -193,6 +242,10 @@ enum class ftp_command
      *    425, 426, 451
      * 450, 550
      * 500, 501, 421, 530
+     *
+     * Added by RFC2228
+     *
+     * 534, 535
      */
     RETR,
     /**
@@ -202,6 +255,10 @@ enum class ftp_command
      *    425, 426, 451, 551, 552
      * 532, 450, 452, 553
      * 500, 501, 421, 530
+     *
+     * Added by RFC2228
+     *
+     * 534, 535
      */
     STOR,
     /**
@@ -211,6 +268,10 @@ enum class ftp_command
      *    425, 426, 451, 551, 552
      * 532, 450, 452, 553
      * 500, 501, 421, 530
+     *
+     * Added by RFC2228
+     *
+     * 534, 535
      */
     STOU,
     /**
@@ -226,6 +287,10 @@ enum class ftp_command
      * 200
      * 202
      * 500, 501, 504, 421, 530
+     *
+     * Added by RFC2228
+     *
+     * 534, 535
      */
     ALLO,
     /**
@@ -277,6 +342,10 @@ enum class ftp_command
      *    425, 426, 451
      * 450
      * 500, 501, 502, 421, 530
+     *
+     * Added by RFC2228
+     *
+     * 534, 535
      */
     LIST,
     /**
@@ -285,6 +354,10 @@ enum class ftp_command
      *    425, 426, 451
      * 450
      * 500, 501, 502, 421, 530
+     *
+     * Added by RFC2228
+     *
+     * 534, 535
      */
     NLST,
     /**
@@ -314,6 +387,51 @@ enum class ftp_command
      * 500 421
      */
     NOOP,
+    /**
+     * RFC2228 commands
+     */
+    /**
+     * 234
+     * 334
+     * 502, 504, 534, 431
+     * 500, 501, 421
+     */
+    AUTH,
+    /**
+     * 235
+     * 335
+     * 503, 501, 535
+     * 500, 501, 421
+     */
+    ADAT,
+    /**
+     * 200
+     * 503
+     * 500, 501, 421, 530
+     */
+    PBSZ,
+    CCC,
+    /**
+     * 200
+     * 504, 536, 503, 534, 431
+     * 500, 501, 421, 530
+     */
+    PROT,
+    /**
+     * 535, 533
+     * 500, 501, 421
+     */
+    MIC,
+    /**
+     * 535, 533
+     * 500, 501, 421
+     */
+    CONF,
+    /**
+     * 535, 533
+     * 500, 501, 421
+     */
+    ENC,
 };
 
 inline auto ftp_command_to_str(ftp_command a_ftp_command) noexcept -> std::string
@@ -386,6 +504,22 @@ inline auto ftp_command_to_str(ftp_command a_ftp_command) noexcept -> std::strin
         return "HELP";
     case ftp_command::NOOP:
         return "NOOP";
+    case ftp_command::AUTH:
+        return "AUTH";
+    case ftp_command::ADAT:
+        return "ADAT";
+    case ftp_command::PBSZ:
+        return "PBSZ";
+    case ftp_command::CCC:
+        return "CCC";
+    case ftp_command::PROT:
+        return "PROT";
+    case ftp_command::MIC:
+        return "MIC";
+    case ftp_command::CONF:
+        return "CONF";
+    case ftp_command::ENC:
+        return "ENC";
     default:
         return "unknown command";
     }
@@ -496,6 +630,52 @@ enum class reply_code
     ACTION_ABORTED_PAGE_TYPE_UNKNOWN_551 = 551,
     FILE_ACTION_ABORTED_552 = 552,
     ACTION_NOT_TAKEN_553 = 553,
+    /**
+     * Added by RFC2228
+     */
+    USER_LOGGED_IN_232 = 232,
+    SECURITY_DATA_EXCHANGE_COMPLETE_234 = 234,
+    /**
+     * This reply indicates that the security data exchange
+     * completed successfully.  The square brackets are not
+     * to be included in the reply, but indicate that
+     * security data in the reply is optional.
+     */
+    SECURITY_DATA_EXCHANGE_COMPLETE_235 = 235,
+    /**
+     * This reply indicates that the requested security mechanism
+     * is OK, and includes security data to be used by the client
+     * to construct the next command.  The square brackets are not
+     * to be included in the reply, but indicate that
+     * security data in the reply is optional.
+     */
+    SECURITY_MECHANISM_OK_334 = 334,
+    /**
+     * This reply indicates that the security data is
+     * acceptable, and more is required to complete the
+     * security data exchange.  The square brackets
+     * are not to be included in the reply, but indicate
+     * that security data in the reply is optional.
+     */
+    SECURITY_DATA_OK_AGAIN_335 = 335,
+    /**
+     * The exact representation of the challenge should be chosen
+     * by the mechanism to be sensible to the human user of the
+     * system.
+     */
+    USERNAME_OK_NEED_PASSWORD_336 = 336,
+    NEED_SOME_UNAVAILABLE_RESOURCE_TO_PROCESS_SECURITY_431 = 431,
+    COMMAND_PROTECTION_LEVEL_DENIED_FOR_POLICY_REASONS_533 = 533,
+    REQUEST_DENIED_FOR_POLICY_REASONS_534 = 534,
+    FAILED_SECURITY_CHECK_535 = 535,
+    REQUESTED_PROT_LEVEL_NOT_SUPPORTED_BY_MECHANISM_536 = 536,
+    COMMAND_PROTECTION_LEVEL_NOT_SUPPORTED_BY_SECURITY_MECHANISM_537 = 537,
+    /**
+     * 6yz - Protected reply
+     */
+    INTEGRITY_PROTECTED_REPLY_631 = 631,
+    CONFIDENTIALITY_AND_INTEGRITY_PROTECTED_REPLY_632 = 632,
+    CONFIDENTIALITY_PROTECTED_REPLY_633 = 633,
 };
 
 inline auto reply_code_to_str(reply_code a_reply_code) noexcept -> std::string
@@ -580,6 +760,36 @@ inline auto reply_code_to_str(reply_code a_reply_code) noexcept -> std::string
         return "Requested file action aborted.";
     case reply_code::ACTION_NOT_TAKEN_553:
         return "Requested action not taken.";
+    case reply_code::USER_LOGGED_IN_232:
+        return "User logged-in.";
+    case reply_code::SECURITY_DATA_EXCHANGE_COMPLETE_234:
+        return "Security data exchange complete.";
+    case reply_code::SECURITY_DATA_EXCHANGE_COMPLETE_235:
+        return "Security data exchange complete.";
+    case reply_code::SECURITY_MECHANISM_OK_334:
+        return "Security mechanism OK.";
+    case reply_code::SECURITY_DATA_OK_AGAIN_335:
+        return "Security data OK, but more is required.";
+    case reply_code::USERNAME_OK_NEED_PASSWORD_336:
+        return "Username OK, password is needed.";
+    case reply_code::NEED_SOME_UNAVAILABLE_RESOURCE_TO_PROCESS_SECURITY_431:
+        return "Need some unavailable resource to process security.";
+    case reply_code::COMMAND_PROTECTION_LEVEL_DENIED_FOR_POLICY_REASONS_533:
+        return "Command protection level denied for policy reasons.";
+    case reply_code::REQUEST_DENIED_FOR_POLICY_REASONS_534:
+        return "Request denied for policy reasons.";
+    case reply_code::FAILED_SECURITY_CHECK_535:
+        return "Failed security check.";
+    case reply_code::REQUESTED_PROT_LEVEL_NOT_SUPPORTED_BY_MECHANISM_536:
+        return "Requested protection level not supported by mechanism.";
+    case reply_code::COMMAND_PROTECTION_LEVEL_NOT_SUPPORTED_BY_SECURITY_MECHANISM_537:
+        return "Command protection level not supported by security mechanism.";
+    case reply_code::INTEGRITY_PROTECTED_REPLY_631:
+        return "Integrity protected reply.";
+    case reply_code::CONFIDENTIALITY_AND_INTEGRITY_PROTECTED_REPLY_632:
+        return "Confidentiality and integrity protected reply.";
+    case reply_code::CONFIDENTIALITY_PROTECTED_REPLY_633:
+        return "Confidentiality protected reply.";
     default:
         return "unknown reply code";
     }
