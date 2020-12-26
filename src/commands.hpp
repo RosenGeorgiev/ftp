@@ -371,6 +371,100 @@ inline auto noop_command() noexcept -> std::string
     return ss.str();
 }
 
+inline auto auth_command(authentication_method a_auth_method) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::AUTH)
+       << SP
+       << authentication_method_to_str(a_auth_method)
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto adat_command(std::string const& a_data) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::ADAT)
+       << SP
+       << a_data
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto pbsz_command(int a_size) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::PBSZ)
+       << SP
+       << a_size
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto ccc_command() noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::CCC)
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto prot_command(data_channel_protection_level a_protection_level) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::PROT)
+       << SP
+       << data_channel_protection_level_to_str(a_protection_level)
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto mic_command(std::string const& a_data) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::MIC)
+       << SP
+       << a_data
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto conf_command(std::string const& a_data) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::CONF)
+       << SP
+       << a_data
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto enc_command(std::string const& a_data) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::ENC)
+       << SP
+       << a_data
+       << CRLF;
+
+    return ss.str();
+}
+
 }   // namespace ftp
 }   // namespace rs
 
