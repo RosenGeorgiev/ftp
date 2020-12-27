@@ -34,6 +34,9 @@ struct connection_options
      */
     bool debug_output{false};
     std::chrono::milliseconds timeout{60000};
+    bool use_ssl{false};
+    std::string cert_file{};
+    std::string ssl_domain{};
     // @Unimplemented
     data_type type{data_type::ASCII};
     // @Unimplemented

@@ -506,20 +506,7 @@ auto client::close()
 auto client::login()
 -> void
 {
-    m_control_connection.write(user_command(m_options.username));
-    check_success(
-        {
-            reply_code::USER_LOGGED_IN_230,
-            reply_code::USERNAME_OK_NEED_PASSWORD_331,
-            reply_code::NEED_ACCOUNT_332
-        },
-        m_control_connection.read_until(CRLF)
-    );
-    m_control_connection.write(password_command(m_options.password));
-    check_success(
-        {reply_code::USER_LOGGED_IN_230},
-        m_control_connection.read_until(CRLF)
-    );
+    login(m_options.username, m_options.password);
 }
 
 auto client::login(
@@ -528,18 +515,52 @@ auto client::login(
 )
 -> void
 {
+    if (m_options.use_ssl)
+    {
+        m_control_connection.write(auth_command(authentication_method::TLS));
+        check_success(
+            {
+                reply_code::SECURITY_DATA_EXCHANGE_COMPLETE_234
+            },
+            m_control_connection.read_until(CRLF)
+        );
+
+        m_control_connection.write(pbsz_command(0));
+        check_success(
+            {
+                reply_code::OK_200
+            },
+            m_control_connection.read_until(CRLF)
+        );
+
+        m_control_connection.write(prot_command(data_channel_protection_level::PRIVATE));
+        check_success(
+            {
+                reply_code::OK_200
+            },
+            m_control_connection.read_until(CRLF)
+        );
+    }
+
     m_control_connection.write(user_command(a_username));
+    auto codes = parse_codes(m_control_connection.read_until(CRLF));
+
+    if (contains_any_of_codes(codes, {reply_code::USER_LOGGED_IN_230, reply_code::USER_LOGGED_IN_232}))
+    {
+        return;
+    }
+
+    if (!contains_any_of_codes(codes, {reply_code::USERNAME_OK_NEED_PASSWORD_331}))
+    {
+        throw std::runtime_error("No reply codes matched - operation failed");
+    }
+
+    m_control_connection.write(password_command(a_password));
     check_success(
         {
             reply_code::USER_LOGGED_IN_230,
-            reply_code::USERNAME_OK_NEED_PASSWORD_331,
-            reply_code::NEED_ACCOUNT_332
+            reply_code::USER_LOGGED_IN_232
         },
-        m_control_connection.read_until(CRLF)
-    );
-    m_control_connection.write(password_command(a_password));
-    check_success(
-        {reply_code::USER_LOGGED_IN_230},
         m_control_connection.read_until(CRLF)
     );
 }

@@ -43,6 +43,25 @@ inline auto parse_codes(
     return ret_codes;
 }
 
+inline auto contains_any_of_codes(
+    std::vector<reply_code> const& a_codes,
+    std::vector<reply_code> const& a_accepted_codes
+) noexcept
+-> bool
+{
+    std::vector<reply_code> matched;
+
+    std::set_intersection(
+        a_accepted_codes.begin(),
+        a_accepted_codes.end(),
+        a_codes.begin(),
+        a_codes.end(),
+        std::back_inserter(matched)
+    );
+
+    return !matched.empty();
+}
+
 inline auto check_success(
     std::vector<reply_code> const& a_accepted_codes,
     std::string const& a_reply_str
@@ -56,17 +75,7 @@ inline auto check_success(
         throw std::runtime_error("No reply codes returned - invalid response");
     }
 
-    std::vector<reply_code> matched;
-
-    std::set_intersection(
-        a_accepted_codes.begin(),
-        a_accepted_codes.end(),
-        returned_codes.begin(),
-        returned_codes.end(),
-        std::back_inserter(matched)
-    );
-
-    if (matched.empty())
+    if (!contains_any_of_codes(returned_codes, a_accepted_codes))
     {
         throw std::runtime_error("No reply codes matched - operation failed");
     }
