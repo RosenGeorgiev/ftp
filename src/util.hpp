@@ -23,6 +23,7 @@ namespace ftp
 static std::regex const codes_regex{"(\\d{3})"};
 static std::regex const ipv4_regex{R"###((\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}))###"};
 static std::regex const pasv_reply_regex{R"###(\((\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})\))###"};
+static std::regex const epsv_reply_regex{R"###(\(\|([12])?\|(.+)?\|([0-9]{1,5})\|\))###"};
 
 inline auto parse_codes(
     std::string const& a_reply_str
@@ -142,6 +143,42 @@ inline auto ipv4_vec_to_str(std::vector<int> const& a_ip_vec) noexcept -> std::s
        << a_ip_vec[3];
 
     return ss.str();
+}
+
+struct epsv_reply
+{
+    // NOTE - Empty in EPSV responses.
+    address_family family{address_family::AF_INET4};
+    // NOTE - Empty in EPSV responses.
+    std::string address{};
+    unsigned short port{DEFAULT_DATA_CONNECTION_PORT};
+};
+
+inline auto parse_epsv_reply(
+    std::string const& a_epsv_reply
+)
+-> epsv_reply
+{
+    std::smatch match;
+
+    if (!std::regex_search(a_epsv_reply, match, epsv_reply_regex) || match.size() < 2)
+    {
+        throw std::runtime_error("Failed to parse EPSV reply");
+    }
+
+    epsv_reply reply;
+
+
+    if (!match[1].str().empty())
+    {
+
+        reply.family = str_to_address_family(match[1].str());
+    }
+
+    reply.address = match[2];
+    reply.port = std::stoi(match[3]);
+
+    return reply;
 }
 
 }   // namespace ftp
