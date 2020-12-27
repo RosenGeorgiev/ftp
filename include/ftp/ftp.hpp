@@ -316,14 +316,6 @@ private:
     /**
      * @brief
      */
-    auto download_active(
-        std::string const& a_filename,
-        std::function<void(std::vector<char> const&)> a_data_callback
-    )
-    -> void;
-    /**
-     * @brief
-     */
     auto download_passive(
         std::string const& a_filename,
         std::function<void(std::vector<char> const&)> a_data_callback
