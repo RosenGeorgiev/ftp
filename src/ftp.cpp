@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include <boost/asio/deadline_timer.hpp>
 
 #include "util.hpp"
