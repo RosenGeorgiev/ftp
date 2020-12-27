@@ -841,18 +841,19 @@ auto client::download_passive(
 auto client::enter_passive_mode(connection& a_data_transfer_connection)
 -> void
 {
-    m_control_connection.write(pasv_command());
+    m_control_connection.write(epsv_command());
     auto response = m_control_connection.read_until(CRLF);
     check_success(
         {
             reply_code::OK_200,
-            reply_code::ENTERING_PASSIVE_MODE_227
+            reply_code::ENTERING_PASSIVE_MODE_227,
+            reply_code::ENTERING_EXTENDED_PASSIVE_MODE_229,
         },
         response);
-    auto [ip_vec, port] = parse_pasv_ipv4_port_reply(response);
+    auto reply = parse_epsv_reply(response);
     a_data_transfer_connection.connect(
-        ipv4_vec_to_str(ip_vec),
-        port,
+        m_options.server_hostname,
+        reply.port,
         m_options.timeout
     );
 }

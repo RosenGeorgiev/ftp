@@ -5,6 +5,7 @@
 
 #include <string>
 #include <cassert>
+#include <exception>
 
 
 namespace rs
@@ -23,6 +24,7 @@ static unsigned short const DEFAULT_DATA_CONNECTION_PORT{DEFAULT_CONTROL_CONNECT
 static std::string const CRLF{"\r\n"};
 static std::string const SP{' '};
 static std::string const COMMA{','};
+static std::string const SEPARATOR{'|'};
 
 enum class data_type
 {
@@ -147,6 +149,45 @@ inline auto authentication_method_to_str(authentication_method a_auth_method)
         return "TLS";
     default:
         return "unknown authentication method";
+    }
+}
+
+enum class address_family
+{
+    AF_INET4 = 1,
+    AF_INET6 = 2,
+    ALL,
+};
+
+inline auto address_family_to_str(address_family a_af)
+{
+    switch (a_af)
+    {
+    case address_family::AF_INET4:
+        return "1";
+    case address_family::AF_INET6:
+        return "2";
+    case address_family::ALL:
+        return "ALL";
+    default:
+        return "unknown address family";
+    }
+}
+
+inline auto str_to_address_family(std::string const& a_af) -> address_family
+{
+    if (a_af == "1")
+    {
+        return address_family::AF_INET4;
+    } else if (a_af == "2")
+    {
+        return address_family::AF_INET6;
+    } else if (a_af == "ALL")
+    {
+        return address_family::ALL;
+    } else
+    {
+        throw std::runtime_error("Invalid address family");
     }
 }
 
@@ -432,6 +473,19 @@ enum class ftp_command
      * 500, 501, 421
      */
     ENC,
+    /**
+     * RFC2428 commands
+     */
+    /**
+     * 200
+     * 500, 501, 522
+     */
+    EPRT,
+    /**
+     * 229
+     * 500, 501, 522
+     */
+    EPSV,
 };
 
 inline auto ftp_command_to_str(ftp_command a_ftp_command) noexcept -> std::string
@@ -520,6 +574,10 @@ inline auto ftp_command_to_str(ftp_command a_ftp_command) noexcept -> std::strin
         return "CONF";
     case ftp_command::ENC:
         return "ENC";
+    case ftp_command::EPRT:
+        return "EPRT";
+    case ftp_command::EPSV:
+        return "EPSV";
     default:
         return "unknown command";
     }
@@ -676,6 +734,11 @@ enum class reply_code
     INTEGRITY_PROTECTED_REPLY_631 = 631,
     CONFIDENTIALITY_AND_INTEGRITY_PROTECTED_REPLY_632 = 632,
     CONFIDENTIALITY_PROTECTED_REPLY_633 = 633,
+    /**
+     * Added by RFC2428
+     */
+    ENTERING_EXTENDED_PASSIVE_MODE_229 = 229,
+    REQUESTED_NETWORK_PROTOCOL_UNSUPPORTED_522 = 522,
 };
 
 inline auto reply_code_to_str(reply_code a_reply_code) noexcept -> std::string
@@ -790,6 +853,10 @@ inline auto reply_code_to_str(reply_code a_reply_code) noexcept -> std::string
         return "Confidentiality and integrity protected reply.";
     case reply_code::CONFIDENTIALITY_PROTECTED_REPLY_633:
         return "Confidentiality protected reply.";
+    case reply_code::ENTERING_EXTENDED_PASSIVE_MODE_229:
+        return "Entering extended passive mode.";
+    case reply_code::REQUESTED_NETWORK_PROTOCOL_UNSUPPORTED_522:
+        return "Requested network protocol unsupported, use (1,2).";
     default:
         return "unknown reply code";
     }

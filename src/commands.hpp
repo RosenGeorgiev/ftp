@@ -465,6 +465,28 @@ inline auto enc_command(std::string const& a_data) noexcept -> std::string
     return ss.str();
 }
 
+inline auto epsv_command() noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::EPSV)
+       << CRLF;
+
+    return ss.str();
+}
+
+inline auto epsv_command(address_family a_af) noexcept -> std::string
+{
+    std::ostringstream ss;
+
+    ss << ftp_command_to_str(ftp_command::EPSV)
+       << SP
+       << address_family_to_str(a_af)
+       << CRLF;
+
+    return ss.str();
+}
+
 }   // namespace ftp
 }   // namespace rs
 
