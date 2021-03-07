@@ -13,7 +13,15 @@ public:
         rs::ftp::connection_options opts;
         opts.username = "admin";
         opts.password = "admin";
-        opts.server_hostname = "localhost";
+
+        if (auto server_hostname = getenv("FTP_SERVER_HOSTNAME"); server_hostname)
+        {
+            opts.server_hostname = server_hostname;
+        } else
+        {
+            opts.server_hostname = "localhost";
+        }
+
         opts.server_port = 21;
         opts.debug_output = true;
 
