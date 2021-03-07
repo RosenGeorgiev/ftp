@@ -1,0 +1,31 @@
+kind: pipeline
+type: docker
+name: default
+
+services:
+- name: vsftpd
+  image: fauria/vsftpd
+  environment:
+    FTP_USER: 'admin'
+    FTP_PASS: 'admin'
+    PASV_ENABLE: 'YES'
+  volumes:
+    - ./ftp_data:/home/vsftpd
+
+steps:
+- name: build
+  image: ubuntu:groovy
+  commands:
+    - apt-get -y -q update --fix-missing
+    - apt-get -y -q upgrade
+    - apt-get -y -q install build-essential cmake libboost-all-dev catch2
+    - mkdir build
+    - cd build
+    - cmake .. -DCMAKE_BUILD_TYPE=Debug -DFTP_ENABLE_TESTS=ON
+    - make -j4
+    - export FTP_SERVER_HOSTNAME="vsftpd"
+    - ctest
+
+  trigger:
+    branch:
+    - master
