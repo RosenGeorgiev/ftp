@@ -1,4 +1,6 @@
 [![License: WTFPL](http://www.wtfpl.net/wp-content/uploads/2012/12/wtfpl-badge-2.png)](http://www.wtfpl.net/txt/copying/)
+[![Build Status](http://drone-ci.lan/api/badges/RS/ftp/status.svg)](http://drone-ci.lan/RS/ftp)
+
 # FTP
 Minimal FTP client implementation attempting to follow [RFC959](https://tools.ietf.org/html/rfc959).
 Partial support for RFC2428. Work on RFC4217 (FTP over TLS) is in progress. Yet another project
